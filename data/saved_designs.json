@@ -1,0 +1,205 @@
+[
+  {
+    "propertyType": "Dream Home",
+    "bed": 3,
+    "bath": 2,
+    "result": {
+      "id": "DH-7987",
+      "seed": 7987,
+      "builtUp": 3010,
+      "cost": 6721330,
+      "style": "Contemporary Residence",
+      "score": 90,
+      "message": "A fresh concept is ready to explore."
+    },
+    "formPayload": {
+      "landSize": "2400",
+      "floors": "2",
+      "entrance": "North-facing",
+      "style": "Contemporary",
+      "budget": "Choose a budget",
+      "vastu": "Vastu preferred",
+      "kitchens": "1 kitchen",
+      "parking": "No parking needed",
+      "livingRoom": "on",
+      "garden": "Small garden",
+      "terrace": "Private balcony",
+      "rentalUnits": "2 units",
+      "sharedParking": "Not required",
+      "separateEntrances": "on",
+      "blocks": "1 block",
+      "flatsPerFloor": "2 flats",
+      "designIdeas": "",
+      "propertyType": "Dream Home",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "features": [
+        "livingRoom",
+        "separateEntrances"
+      ],
+      "ideas": "",
+      "layoutCycle": 18
+    },
+    "history": [
+      "welcome",
+      "brief",
+      "model",
+      "finish"
+    ],
+    "planStyle": "3d",
+    "selectedFloor": 0,
+    "title": "Contemporary Residence",
+    "ideas": "",
+    "savedAt": "2026-08-04T06:11:11.140798+00:00"
+  },
+  {
+    "propertyType": "Dream Home",
+    "bed": 3,
+    "bath": 2,
+    "result": {
+      "id": "DH-5108",
+      "seed": 5108,
+      "builtUp": 2978,
+      "cost": 5649266,
+      "style": "Contemporary Residence",
+      "score": 93,
+      "message": "A fresh concept is ready to explore."
+    },
+    "formPayload": {
+      "landSize": "2400",
+      "floors": "2",
+      "entrance": "North-facing",
+      "style": "Contemporary",
+      "budget": "Choose a budget",
+      "vastu": "Vastu preferred",
+      "kitchens": "1 kitchen",
+      "parking": "No parking needed",
+      "livingRoom": "on",
+      "garden": "Small garden",
+      "terrace": "Private balcony",
+      "rentalUnits": "2 units",
+      "sharedParking": "Not required",
+      "separateEntrances": "on",
+      "blocks": "1 block",
+      "flatsPerFloor": "2 flats",
+      "designIdeas": "",
+      "propertyType": "Dream Home",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "features": [
+        "livingRoom",
+        "separateEntrances"
+      ],
+      "ideas": ""
+    },
+    "history": [
+      "welcome",
+      "brief",
+      "model",
+      "history",
+      "model",
+      "finish"
+    ],
+    "planStyle": "furnished",
+    "selectedFloor": 0,
+    "title": "Contemporary Residence",
+    "ideas": "",
+    "savedAt": "2026-07-20T04:59:02.854448+00:00"
+  },
+  {
+    "propertyType": "Dream Home",
+    "bed": 3,
+    "bath": 2,
+    "result": {
+      "id": "DH-2573",
+      "seed": 2573,
+      "builtUp": 2892,
+      "cost": 6197556,
+      "style": "Contemporary Residence",
+      "score": 90,
+      "message": "A fresh concept is ready to explore."
+    },
+    "formPayload": {
+      "landSize": "2400",
+      "floors": "2",
+      "entrance": "North-facing",
+      "style": "Contemporary",
+      "budget": "Choose a budget",
+      "vastu": "Vastu preferred",
+      "kitchens": "1 kitchen",
+      "parking": "No parking needed",
+      "livingRoom": "on",
+      "garden": "Small garden",
+      "terrace": "Private balcony",
+      "rentalUnits": "2 units",
+      "sharedParking": "Not required",
+      "separateEntrances": "on",
+      "blocks": "1 block",
+      "flatsPerFloor": "2 flats",
+      "designIdeas": "",
+      "propertyType": "Dream Home",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "features": [
+        "livingRoom",
+        "separateEntrances"
+      ],
+      "ideas": ""
+    },
+    "history": [
+      "welcome",
+      "brief",
+      "model",
+      "history",
+      "model",
+      "finish"
+    ],
+    "title": "Contemporary Residence",
+    "ideas": "",
+    "savedAt": "2026-07-10T15:42:38.999628+00:00"
+  },
+  {
+    "propertyType": "Dream Home",
+    "bed": 3,
+    "bath": 2,
+    "result": {
+      "id": "DH-8500",
+      "seed": 8500,
+      "builtUp": 2930,
+      "cost": 6542690,
+      "style": "Modern Residence",
+      "score": 84,
+      "message": "A fresh concept is ready to explore."
+    },
+    "title": "Modern Residence",
+    "configuration": {
+      "landSize": "2400",
+      "floors": "2",
+      "entrance": "North-facing",
+      "style": "Modern"
+    },
+    "savedAt": "2026-07-10T04:28:34.849337+00:00"
+  },
+  {
+    "propertyType": "Dream Home",
+    "bed": 3,
+    "bath": 2,
+    "result": {
+      "id": "DH-8500",
+      "seed": 8500,
+      "builtUp": 2930,
+      "cost": 6542690,
+      "style": "Modern Residence",
+      "score": 84,
+      "message": "A fresh concept is ready to explore."
+    },
+    "title": "Modern Residence",
+    "configuration": {
+      "landSize": "2400",
+      "floors": "2",
+      "entrance": "North-facing",
+      "style": "Modern"
+    },
+    "savedAt": "2026-07-10T04:28:33.148813+00:00"
+  }
+]
