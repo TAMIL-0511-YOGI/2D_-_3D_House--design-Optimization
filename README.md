@@ -1,16 +1,24 @@
-# AI-Powered Smart Home Design & Optimization
+# Deep Learning Smart Home Design & Optimization
 
 ## Abstract
 
-AI-Powered Smart Home Design & Optimization is an intelligent architectural planning platform that generates professional 2D and 3D floor-plan concepts from user requirements. Users can specify land area, building type, floors, rooms, entrance direction, parking, and Vastu preferences. The system applies architectural planning rules and AI-inspired optimization to produce dimensioned layout sketches, furnished 2D floor-plan views, and 3D floor-plan-style visualizations, with alternative layouts available through regeneration. It simplifies early home planning, reduces design effort and cost, and helps users visualize personalized building concepts before construction.
+Deep Learning Smart Home Design & Optimization is a deep-learning-oriented architectural planning project that converts user requirements into optimized 2D and 3D home-layout concepts. Users provide land area, building type, floors, rooms, entrance direction, parking, Vastu preference, budget, and optional features. The application is structured around a future neural layout generator while preserving deterministic validation and browser-based SVG rendering.
+
+The current runnable version uses a lightweight inference adapter in `ml/` so the webpage still opens with only Python installed. A production deep-learning version can replace that adapter with trained PyTorch or TensorFlow inference after a licensed, architect-labelled floor-plan geometry dataset is available.
+
+## Deep-Learning Project Focus
+
+- Neural-layout architecture boundary in `ml/model.py`
+- Inference adapter in `ml/predict.py`
+- Training entry-point placeholder in `ml/train.py`
+- Hybrid pipeline: user brief -> model metadata/score -> validated concept -> SVG plan rendering
+- Existing `/api/generate`, `/api/save`, and `/api/designs` endpoints preserved for webpage stability
 
 ## SDG Mapping
 
-**SDG 11 – Sustainable Cities and Communities** is the project's primary Sustainable Development Goal. Dream Home Designer helps people explore more thoughtful, inclusive, and space-efficient housing concepts for homes, rental properties, and apartments. Its options for accessible design, shared facilities, and solar power can support more livable and resilient communities.
+**SDG 11 - Sustainable Cities and Communities** is the primary Sustainable Development Goal. The project supports early exploration of space-efficient, accessible, and resilient housing concepts. Solar and shared-energy options also connect the project to **SDG 7 - Affordable and Clean Energy**.
 
-The optional solar-power features also provide a secondary connection to **SDG 7 – Affordable and Clean Energy**.
-
-## Run locally
+## Run Locally
 
 From this folder, run:
 
@@ -18,17 +26,17 @@ From this folder, run:
 python app.py
 ```
 
-Then open http://localhost:8000 in a browser.
+Then open `http://localhost:8000` in a browser.
 
-## Current functionality
+## Current Functionality
 
-- Home / rental / apartment project modes
-- Land, floors, direction, style, rooms, and rental-unit inputs
-- Fresh generated concept metrics on every generation
-- Drag-to-rotate visual 3D concept preview
-- Local JSON save library (`data/saved_designs.json`)
-- Exportable JSON project brief
+- Home, Full Rental, and Home + Rental (Owner Ground Floor + Upper Rentals) project modes
+- Land, floors, direction, style, rooms, parking, and feature inputs
+- Deep-learning-oriented concept metadata from the local inference adapter
+- Neural-style design score returned by `POST /api/generate`
+- Pencil, furnished 2D, and 3D floor-plan-style SVG views
+- Regeneration, browser history, and local JSON saving
 
-## Recommended saving formats
+## Important Note
 
-Use JSON for editable project requirements (implemented), PNG/JPG for design previews, PDF for client-facing briefs, and GLB for future interactive 3D models. For professional construction, export IFC/DWG through a specialist CAD/BIM workflow after architect review.
+The app is now structured as a deep-learning project, but real neural training is not included because the repository does not contain licensed labelled architectural geometry data or ML framework dependencies. This keeps the webpage opening reliably while making the project ready for a trained model upgrade.

@@ -2,18 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI-Powered Smart Home Design &amp; Optimization</title><link rel="stylesheet" href="style.css" /><link rel="stylesheet" href="hero-image.css" />
+  <title>Deep Learning Smart Home Design &amp; Optimization</title><link rel="stylesheet" href="style.css?v=20260903_v10" /><link rel="stylesheet" href="hero-image.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
   <main class="app-shell">
     <section class="screen welcome-screen active" data-screen="welcome">
       <div class="welcome-nav"><div class="brand"><span class="brand-mark">⌂</span> DreamHome <b>AI</b></div><span>YOUR PERSONAL HOME DESIGNER</span></div>
       <div class="welcome-copy">
-        <p class="eyebrow">AI-POWERED SMART HOME DESIGN &amp; OPTIMIZATION</p>
+        <p class="eyebrow">DEEP-LEARNING SMART HOME DESIGN &amp; OPTIMIZATION</p>
         <h1>DREAM TO DESIGN<br>YOUR OWN LIFESTYLE</h1>
-        <p>AI-powered planning that transforms your requirements into optimized, dimensioned home and apartment floor-plan concepts.</p>
+        <p>Deep-learning-oriented planning that transforms your requirements into optimized, dimensioned home and rental floor-plan concepts.</p>
         <button class="primary-action" data-go="brief">Start designing <span>→</span></button>
       </div>
       <img class="hero-house" src="modern-house.jpg" alt="Contemporary two-storey home concept" />
@@ -23,21 +25,21 @@
     <section class="screen brief-screen" data-screen="brief">
       <header class="flow-header"><button class="back-button" data-back aria-label="Back">←</button><div class="brand"><span class="brand-mark">⌂</span> DreamHome <b>AI</b></div><span>STEP 01 OF 03</span></header>
       <div class="brief-wrap">
-        <div><p class="eyebrow">YOUR DESIGN BRIEF</p><h2>Tell us about<br>your dream space.</h2><p class="subcopy">A few choices are all it takes to shape your first AI concept. You can refine every detail later.</p></div>
+        <div><p class="eyebrow">YOUR DESIGN BRIEF</p><h2>Tell us about<br>your dream space.</h2><p class="subcopy">A few choices are all it takes to shape your first deep-learning concept. You can refine every detail later.</p></div>
         <form id="designForm" class="brief-card">
           <div class="form-scroll">
-            <label>What are you planning?<div class="segmented" id="propertyType"><button type="button" class="chosen" data-value="Dream Home">⌂ Home</button><button type="button" data-value="Rental Homes">▦ Rental</button><button type="button" data-value="Apartment">▥ Apartment</button></div></label>
+            <label>What are you planning?<div class="segmented" id="propertyType"><button type="button" class="chosen" data-value="Dream Home">⌂ Home</button><button type="button" data-value="Rental Homes">▦ Rental</button><button type="button" data-value="Home + Rental">⌂+▦ Home / Rental</button></div></label>
             <p class="form-section-title">Project essentials</p>
             <div class="field-row"><label>Land size <div class="input-wrap"><input id="landSize" name="landSize" type="number" value="2400" min="300" /><span>sq ft</span></div></label><label>Floors <select id="floors" name="floors"><option value="1">1 floor</option><option value="2" selected>2 floors</option><option value="3">3 floors</option><option value="4">4+ floors</option></select></label></div>
             <div class="field-row"><label>Entrance direction <select id="entrance" name="entrance"><option>North-facing</option><option>East-facing</option><option>South-facing</option><option>West-facing</option></select></label><label>Architecture style <select id="style" name="style"><option>Contemporary</option><option>Modern</option><option>Minimalist</option><option>Traditional</option><option>Modern traditional blend</option></select></label></div>
             <div class="field-row"><label>Budget range <select name="budget"><option>Choose a budget</option><option>Under ₹50 lakh</option><option>₹50 lakh – ₹1 crore</option><option>₹1 crore – ₹2 crore</option><option>Above ₹2 crore</option></select></label><label>Vastu preference <select name="vastu"><option>Vastu preferred</option><option>Strict Vastu</option><option>No preference</option></select></label></div>
             <p class="form-section-title">Rooms &amp; spaces</p>
             <label>Primary rooms <div class="room-row"><span>Bedrooms</span><button class="qty" type="button" data-room="bed" data-change="-1">−</button><b id="bedCount">3</b><button class="qty" type="button" data-room="bed" data-change="1">+</button><span class="room-divider"></span><span>Bathrooms</span><button class="qty" type="button" data-room="bath" data-change="-1">−</button><b id="bathCount">2</b><button class="qty" type="button" data-room="bath" data-change="1">+</button></div></label>
-            <div class="field-row"><label>Kitchens <select name="kitchens"><option>1 kitchen</option><option>2 kitchens</option><option>3+ kitchens</option></select></label><label>Parking <select name="parking"><option>No parking needed</option><option>1 car</option><option>2 cars</option><option>3+ cars</option></select></label></div>
-            <div class="choice-grid" aria-label="Additional rooms"><label><input type="checkbox" name="livingRoom" checked> Living room</label><label><input type="checkbox" name="dining"> Dining room</label><label><input type="checkbox" name="poojaRoom"> Pooja room</label><label><input type="checkbox" name="utilityRoom"> Utility room</label></div>
-            <div class="type-panel active" data-type-panel="Dream Home"><p class="form-section-title">Personal house features</p><div class="field-row"><label>Garden / open space <select name="garden"><option>Small garden</option><option>Large garden</option><option>Open courtyard</option><option>No garden</option></select></label><label>Balcony / terrace <select name="terrace"><option>Private balcony</option><option>Roof terrace</option><option>Both balcony &amp; terrace</option><option>Not required</option></select></label></div><div class="choice-grid feature-grid"><label><input type="checkbox" name="swimmingPool"> Swimming pool</label><label><input type="checkbox" name="homeOffice"> Home office</label><label><input type="checkbox" name="smartHome"> Smart home</label><label><input type="checkbox" name="solarPanels"> Solar panels</label><label><input type="checkbox" name="lift"> Lift</label><label><input type="checkbox" name="elderFriendly"> Elder-friendly design</label></div></div>
-            <div class="type-panel" data-type-panel="Rental Homes"><p class="form-section-title">Rental house requirements</p><div class="field-row"><label>Rental units <select name="rentalUnits"><option>2 units</option><option>3 units</option><option>4 units</option><option>5+ units</option></select></label><label>Shared parking <select name="sharedParking"><option>Not required</option><option>1 shared area</option><option>2+ shared areas</option></select></label></div><div class="choice-grid"><label><input type="checkbox" name="separateEntrances" checked> Separate entrances</label><label><input type="checkbox" name="sharedWater"> Shared water facilities</label><label><input type="checkbox" name="independentMeters"> Independent meters</label><label><input type="checkbox" name="ownerUnit"> Owner unit included</label></div></div>
-            <div class="type-panel" data-type-panel="Apartment"><p class="form-section-title">Apartment specifications</p><div class="field-row"><label>Apartment blocks <select name="blocks"><option>1 block</option><option>2 blocks</option><option>3+ blocks</option></select></label><label>Flats per floor <select name="flatsPerFloor"><option>2 flats</option><option>4 flats</option><option>6 flats</option><option>8+ flats</option></select></label></div><div class="choice-grid feature-grid"><label><input type="checkbox" name="apartmentLift"> Lift required</label><label><input type="checkbox" name="basementParking"> Parking area</label><label><input type="checkbox" name="playArea"> Children's play area</label><label><input type="checkbox" name="securityRoom"> Security room</label><label><input type="checkbox" name="commercialShops"> Commercial shops</label><label><input type="checkbox" name="solarCommon"> Common solar power</label></div></div>
+            <div class="field-row"><label>Kitchens <select name="kitchens"><option>1 kitchen</option><option>2 kitchens</option><option>3+ kitchens</option></select></label><label>Parking <select name="parking"><option>No parking needed</option><option>1 car</option><option selected>2 cars</option><option>3+ cars</option></select></label></div>
+            <div class="choice-grid" aria-label="Additional rooms"><label><input type="checkbox" name="livingRoom" checked> Living room</label><label><input type="checkbox" name="dining" checked> Dining room</label><label><input type="checkbox" name="poojaRoom" checked> Pooja room</label><label><input type="checkbox" name="utilityRoom"> Utility room</label></div>
+            <div class="type-panel active" data-type-panel="Dream Home"><p class="form-section-title">Personal house features</p><div class="field-row"><label>Garden / open space <select name="garden"><option>Small garden</option><option>Large garden</option><option>Open courtyard</option><option>No garden</option></select></label><label>Balcony / terrace <select name="terrace"><option>Private balcony</option><option>Roof terrace</option><option selected>Both balcony &amp; terrace</option><option>Not required</option></select></label></div><div class="choice-grid feature-grid"><label><input type="checkbox" name="swimmingPool"> Swimming pool</label><label><input type="checkbox" name="homeOffice" checked> Home office</label><label><input type="checkbox" name="smartHome"> Smart home</label><label><input type="checkbox" name="solarPanels"> Solar panels</label><label><input type="checkbox" name="lift"> Lift</label><label><input type="checkbox" name="elderFriendly"> Elder-friendly design</label></div></div>
+            <div class="type-panel" data-type-panel="Rental Homes"><p class="form-section-title">Full rental property requirements</p><div class="field-row"><label>Rental units <select name="rentalUnits"><option>2 units</option><option>3 units</option><option>4 units</option><option>5+ units</option></select></label><label>Shared parking <select name="sharedParking"><option>Not required</option><option>1 shared area</option><option>2+ shared areas</option></select></label></div><div class="choice-grid"><label><input type="checkbox" name="separateEntrances" checked> Separate entrances</label><label><input type="checkbox" name="sharedWater"> Shared water facilities</label><label><input type="checkbox" name="independentMeters" checked> Independent meters</label><label><input type="checkbox" name="tenantSecurity"> Tenant CCTV &amp; security</label></div></div>
+            <div class="type-panel" data-type-panel="Home + Rental"><p class="form-section-title">Home + Rental setup (Owner Ground + Upper Rental)</p><div class="field-row"><label>Floor distribution <select name="floorDistribution"><option selected>Ground: Owner | Upper: Rental</option><option>Ground: Owner 3BHK | 1st: Two 1BHKs</option><option>Ground: Parking + Owner | 1st: Rental</option><option>Ground: Owner + 1 Rental | 1st: 2 Rentals</option></select></label><label>Rental units on upper floor(s) <select name="rentalUnitsPerFloor"><option selected>1 spacious 2BHK rental house</option><option>2 independent 1BHK rental houses</option><option>1BHK + Studio unit combo</option><option>3 compact bachelor units</option></select></label></div><div class="choice-grid feature-grid"><label><input type="checkbox" name="separateStairs" checked> External tenant stairs</label><label><input type="checkbox" name="independentMeters" checked> Independent sub-meters</label><label><input type="checkbox" name="separateGates" checked> Separate owner &amp; tenant gates</label><label><input type="checkbox" name="ownerPrivateGarden" checked> Owner private porch/garden</label><label><input type="checkbox" name="tenantParking"> Tenant bike &amp; car parking</label><label><input type="checkbox" name="separateTanks"> Separate overhead tanks</label><label><input type="checkbox" name="soundInsulation"> Acoustic slab insulation</label><label><input type="checkbox" name="solarBackup"> Solar power backup</label></div></div>
             <label class="idea-field">Your ideas <textarea id="designIdeas" name="designIdeas" placeholder="e.g. A sunny courtyard, a quiet home office, and a big family kitchen."></textarea></label>
           </div>
           <button class="primary-action generate" type="submit">Create my design <span>→</span></button>
@@ -47,11 +49,30 @@
 
     <section class="screen model-screen" data-screen="model">
       <header class="flow-header"><button class="back-button" data-back aria-label="Back">←</button><div class="brand"><span class="brand-mark">⌂</span> DreamHome <b>AI</b></div><span>STEP 02 OF 03</span></header>
-      <div class="model-heading"><div><p class="eyebrow">AI CONCEPT READY</p><h2 id="designTitle">Courtyard Modern Residence</h2><p>Compare the architectural pencil plan with a fully furnished 2D layout.</p></div><div class="design-score"><span id="scoreMetric">94</span><small>DESIGN SCORE</small></div></div>
-      <div class="mode-switch"><button class="active" data-mode="sketch">PENCIL FLOOR PLAN</button><button data-mode="furnished">FURNISHED 2D PLAN</button><button data-mode="3d">3D FLOOR PLAN</button></div>
+      <div class="model-heading"><div><p class="eyebrow">DEEP-LEARNING CONCEPT READY</p><h2 id="designTitle">Courtyard Modern Residence</h2><p>Compare the neural-layout pencil plan with a fully furnished 2D and realistic 3D cutaway layout.</p></div><div class="design-score"><span id="scoreMetric">94</span><small>MODEL SCORE</small></div></div>
+      <div class="mode-switch"><button data-mode="sketch">PENCIL FLOOR PLAN</button><button class="active" data-mode="furnished">FURNISHED 2D PLAN</button><button data-mode="3d">3D FLOOR PLAN</button></div>
       <div class="floor-switch" id="floorSelector"></div>
       <section class="viewer-card">
+        <div class="viewer-toolbar" id="viewerToolbar">
+          <div class="toolbar-group camera-group" id="cameraControls">
+            <span class="toolbar-label">VIEW:</span>
+            <button class="tool-btn active" data-view="iso">◱ Isometric 3D</button>
+            <button class="tool-btn" data-view="top">⬚ Top-Down</button>
+            <button class="tool-btn" data-view="front">⬒ Front 3D</button>
+            <button class="tool-btn" data-view="side">◧ Side View</button>
+          </div>
+          <div class="toolbar-group action-group">
+            <button class="tool-btn" id="toggleLighting" title="Toggle Daylight / Warm Evening Interior Lighting">☀ Daylight</button>
+            <button class="tool-btn" id="resetCamera" title="Reset View Angle">↺ Reset</button>
+            <span class="viewer-badge" id="planBadge">FURNISHED 3D CUTAWAY</span>
+          </div>
+        </div>
         <div class="floor-plan mode-content active" data-mode-content="plan" id="floorPlan"><div class="plan-loading">Generating your room plan…</div></div>
+        <div class="room-inspect-tooltip" id="roomTooltip"></div>
+        <div class="viewer-hint" id="viewerHint">
+          <span class="hint-3d">🖱 <b>Drag</b> to rotate 360° · <b>Scroll</b> to zoom · <b>Right-click</b> to pan · <b>Hover</b> over rooms to inspect</span>
+          <span class="hint-2d" style="display:none;">📐 <b>Architectural Plan</b> · Fully dimensioned layout with modern furnishings</span>
+        </div>
       </section>
       <div class="model-footer"><div><small>BUILT-UP AREA</small><b id="areaMetric">3,168 sq ft</b></div><div><small>YOUR INPUT</small><b id="ideaSummary">Thoughtful family living</b></div><button class="secondary-action" id="regenerate">↻ Regenerate</button><button class="secondary-action" id="openHistory">◷ Previous designs</button><button class="primary-action" data-go="finish">Continue <span>→</span></button></div>
     </section>
@@ -62,5 +83,5 @@
     </section>
 
     <section class="screen finish-screen" data-screen="finish"><header class="flow-header"><button class="back-button" data-back aria-label="Back">←</button><div class="brand"><span class="brand-mark">⌂</span> DreamHome <b>AI</b></div></header><div class="finish-copy"><p class="eyebrow">YOUR HOME, VISUALISED</p><h2>Your concept is ready<br>to grow with you.</h2><p>Save this starting point and return whenever inspiration strikes.</p><button class="primary-action" id="saveDesign">Save my concept <span>♡</span></button><button class="plain-action" data-go="brief">Start another design</button></div></section>
-  </main><div class="toast" id="toast"></div><script src="app.js?v=7"></script>
+  </main><div class="toast" id="toast"></div><script src="app.js?v=20260903_v11"></script>
 </body></html>

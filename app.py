@@ -1,10 +1,17 @@
-"""Dream Home Designer – local prototype server (standard library only)."""
+"""DreamHome AI deep-learning-oriented local prototype server.
+
+The server keeps the existing standard-library-only runtime so the webpage opens
+with `python app.py`. Deep-learning inference is isolated behind `ml.predict`;
+today it provides a safe heuristic fallback with the same API shape expected
+from a future trained neural layout model.
+"""
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 import json
 import random
 from datetime import datetime, timezone
+from ml.predict import infer_concept_metadata
 
 ROOT = Path(__file__).parent
 DATA = ROOT / "data"
@@ -20,6 +27,12 @@ def body(handler):
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT / "static"), **kwargs)
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
 
     def reply(self, payload, status=200):
         raw = json.dumps(payload).encode()
@@ -43,12 +56,44 @@ class Handler(SimpleHTTPRequestHandler):
                 seed = random.randint(1000, 9999)
                 size = int(payload.get("landSize") or 2400)
                 floors = int(payload.get("floors") or 2)
-                area = round(size * (0.58 + random.random() * .16))
-                cost = area * floors * random.randint(1700, 2300)
+                prop_type = payload.get("propertyType", "Dream Home")
+                model_meta = infer_concept_metadata(payload)
+                cycle = int(payload.get("layoutCycle") or 0)
+
+                # Accurate area metric respecting user's land size and floors
+                built_up = size * floors if floors > 1 else size
+                cost = built_up * random.randint(1800, 2200)
+
+                style_names = {
+                    "Dream Home": [
+                        "Courtyard Modern Residence",
+                        "Open-Concept L-Shaped Villa",
+                        "Symmetrical Center-Hall Estate",
+                        "Dual-Wing Pavilion Home"
+                    ],
+                    "Rental Homes": [
+                        "Multi-Unit Rental Complex",
+                        "Independent Flats Rental Building",
+                        "Dual-Flats Income Property",
+                        "Multi-Tenant Residential Building"
+                    ],
+                    "Home + Rental": [
+                        "Ground Owner Villa + 1st Floor Rental Flats",
+                        "Owner Ground Residence + Upper 2-Unit Rentals",
+                        "Dual-Entrance Owner House & Tenant Floor",
+                        "Owner Courtyard Home + Independent Upper Units"
+                    ]
+                }
+                styles = style_names.get(prop_type, style_names["Home + Rental"])
+                chosen_style = styles[cycle % len(styles)]
+
                 return self.reply({
-                    "id": f"DH-{seed}", "seed": seed, "builtUp": area * floors,
-                    "cost": cost, "style": payload.get("style", "Modern") + " Residence",
-                    "score": random.randint(82, 96), "message": "A fresh concept is ready to explore."
+                    "id": f"DH-{seed}", "seed": seed, "builtUp": built_up,
+                    "landSize": size, "floors": floors, "propertyType": prop_type,
+                    "cost": cost, "style": chosen_style,
+                    "score": model_meta["score"], "message": "A deep-learning layout concept is ready to explore.",
+                    "model": model_meta["model"], "modelVersion": model_meta["modelVersion"],
+                    "modelStage": model_meta["modelStage"]
                 })
             if path == "/api/save":
                 designs = json.loads(SAVED.read_text()) if SAVED.exists() else []
@@ -62,5 +107,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Dream Home Designer running at http://localhost:8000")
+    print("DreamHome AI running at http://localhost:8000")
     ThreadingHTTPServer(("", 8000), Handler).serve_forever()

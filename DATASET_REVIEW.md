@@ -1,72 +1,86 @@
-# Dataset Review: DreamHome Concept Benchmark v1
+# Dataset Review and Deep-Learning Methodology
 
-## Purpose
+## Current Implementation
 
-This project does not currently train a machine-learning model. It is a rule-based, seeded procedural floor-plan prototype: `app.py` calculates concept metrics and `static/app.js` renders an SVG layout. Therefore, the appropriate dataset is a **small, structured benchmark and test dataset**, not a claimed AI training corpus.
+DreamHome AI is now organized as a **deep-learning-oriented hybrid project**. The application includes a dedicated `ml/` package for model specification, inference adaptation, and future training. The runnable local version still avoids heavy ML dependencies so the webpage continues to open with:
 
-`data/dreamhome_design_dataset.json` is a synthetic, project-specific dataset of 18 representative briefs. It lets the project demonstrate that its input fields, concept metrics, and layout categories have been tested across realistic combinations. It contains no copied floor plans, personal information, or client data.
+```powershell
+python app.py
+```
 
-## Dataset contents
+This means the project architecture is deep-learning based, while real trained-model inference is represented by a safe local adapter until a licensed labelled geometry dataset and model weights are added.
 
-Each record is one architectural brief. The records span the three property types offered in the interface:
+## Dataset Used in This Repository
 
-| Segment | Records | What it covers |
-| --- | ---: | --- |
-| Dream Home | 11 | Compact 1BHK/2BHK, family duplexes, villas, accessibility, sustainability, and premium multi-floor homes |
-| Rental Homes | 4 | Two to four rental units, shared parking, separate entrances, meters, and owner units |
-| Apartment | 3 | Six-, eight-, and twelve-flat configurations, including blocks, lifts, security, and common solar |
+The repository includes `data/dreamhome_design_dataset.json`, a synthetic educational benchmark with 18 representative design briefs. It is useful for demonstration, API regression checks, and expected-output planning categories.
 
-### Field groups
+It is **not enough for neural-network training** because it does not include room polygons, walls, doors, windows, adjacency graphs, or architect-approved geometry labels.
 
-| Field group | Dataset fields | Project use |
-| --- | --- | --- |
-| Site and form inputs | `land_size_sqft`, `floors`, `entrance`, `style`, `budget`, `vastu` | Directly mirrors the design brief form |
-| Accommodation | `bedrooms`, `bathrooms`, `kitchens`, `parking_cars` | Tests area allocation and visible room generation |
-| Type-specific inputs | `garden`, `terrace`, `rental_units`, `shared_parking`, `blocks`, `flats_per_floor` | Supports the conditional Home/Rental/Apartment form panels |
-| Requested features | `features` | Records requirements such as solar panels, lift, separate entrances, and accessibility |
-| Benchmark labels | `target_built_up_sqft`, `target_score`, `layout_profile`, `validation_status` | Reference values for comparing a generated concept with an expected planning category |
+| Dataset Content | Fields Currently Available |
+| --- | --- |
+| Design brief | `property_type`, `land_size_sqft`, `floors`, `entrance`, `style`, `budget`, `vastu` |
+| Room programme | `bedrooms`, `bathrooms`, `kitchens`, `parking_cars`, `garden`, `terrace`, `features` |
+| Expected concept result | `target_built_up_sqft`, `target_score`, `layout_profile`, `validation_status` |
+| Optional building fields | Rental and apartment-specific fields |
 
-## Review of suitability
+## Required Dataset for Real Deep Learning
 
-### What it supports well
+A production neural floor-plan generator requires a separate licensed, architect-reviewed dataset. Each record should pair a user brief with approved plan geometry and validation labels.
 
-- **Functional testing:** every property type and most form options are represented, so developers can submit each record to `POST /api/generate` and confirm that the app returns a valid concept.
-- **Regression testing:** keeping fixed briefs makes it easy to notice if a later change breaks a floor count, parking logic, or layout variation.
-- **Demonstration:** the dataset is much more varied than `saved_designs.json`, whose current records are predominantly 2-floor, 3-bedroom contemporary homes on 2,400 sq ft plots.
-- **Future rule calibration:** `layout_profile` offers understandable labels such as `compact_2bhk` and `two_unit_rental` that can later map to real zoning rules.
+Required fields:
 
-### What it cannot support
+- plot polygon, width, depth, setbacks, and north direction;
+- floor number and floor-level metadata;
+- room polygons or bounding boxes with room labels and dimensions;
+- walls, doors, windows, stairs, and circulation paths;
+- room-adjacency graph;
+- user brief requirements;
+- code, Vastu, accessibility, and sustainability labels;
+- architect-approved quality labels.
 
-- It cannot train or validate a real ML floor-plan generator: 18 synthetic records are far too few and have no vector geometry, room coordinates, adjacency graph, site dimensions, setbacks, climate, or architect-approved final drawings.
-- `target_built_up_sqft` and `target_score` are illustrative benchmark labels, not construction estimates or professionally verified quality scores.
-- The current renderer does not fully implement Rental Homes and Apartment spatial logic; it chiefly displays home-style room arrangements. The corresponding records expose this as a future development gap rather than hiding it.
+Use project-level train, validation, and test splits. Do not split near-duplicate floors from the same building across different sets, because that inflates model performance.
 
-## Data-quality review
+## Deep-Learning Techniques Selected
 
-The dataset is deliberately balanced by property type, land size (750–5,000 sq ft), floor count (1–4), entrance direction, style, and feature choice. It also includes smaller plots and no-parking cases, avoiding a dataset made only of large premium homes. Values are internally plausible as concept-level examples, but they are not region-specific building regulations.
+| Technique | Role in DreamHome AI |
+| --- | --- |
+| Graph Neural Network | Predicts room adjacency and room relationship graphs from the brief. |
+| Conditional layout generator | Converts room requirements and adjacency into room boxes or polygons. |
+| CNN / vision encoder | Optional model for extracting structure from existing floor-plan images. |
+| Transformer layout model | Optional sequence model for ordered room-placement prediction. |
+| Learning-to-rank model | Ranks valid candidate layouts by quality, usability, and constraints. |
+| Deterministic validator | Rejects invalid model outputs before rendering. |
 
-There are three important limitations to state in a project report:
+## Current Code Mapping
 
-1. **Synthetic origin:** labels reflect planning assumptions created for this prototype, so they may encode those assumptions.
-2. **Small sample:** it is a benchmark dataset for testing and presentation, not statistically representative of housing demand.
-3. **No professional approval:** all generated and target values require architect, structural-engineer, and local-authority review before real construction.
+| File | Deep-Learning Purpose |
+| --- | --- |
+| `ml/model.py` | Stores the model card and expected neural-layout inputs/outputs. |
+| `ml/predict.py` | Provides the current inference adapter and score boundary. |
+| `ml/train.py` | Defines the future training entry point and dataset prerequisites. |
+| `app.py` | Calls the inference adapter from `/api/generate`. |
+| `static/app.js` | Renders the selected plan without breaking the existing webpage. |
 
-## How it relates to existing project data
+## Proposed Training Workflow
 
-| File | Role | Should it be used as ML training data? |
-| --- | --- | --- |
-| `data/saved_designs.json` | Archive of concepts explicitly saved in the app | No; it is small, user-generated, and schema varies between records |
-| `data/dreamhome_design_dataset.json` | Fixed synthetic benchmark created for testing, reporting, and future rule design | Not for ML training; useful for deterministic evaluation and demo scenarios |
-| Browser `localStorage` | Up to 15 recent concepts in one browser | No; temporary client-side history |
+1. Build or license a labelled architectural geometry dataset.
+2. Normalize all plans into structured JSON: plot, rooms, walls, openings, stairs, adjacency, and labels.
+3. Train an adjacency GNN using room requirements and site constraints.
+4. Train a conditional layout generator using the graph and plot geometry.
+5. Validate candidates for overlap, access, missing rooms, minimum sizes, setbacks, and Vastu rules.
+6. Rank valid layouts and return the best candidate geometry to the frontend.
+7. Keep architect review mandatory before construction use.
 
-## Recommended evaluation procedure
+## Evaluation Metrics
 
-For every dataset record, submit the applicable input fields to `/api/generate`, then record: response success, generated built-up area, generated score, selected layout variation, and whether the rendered plan contains the expected high-level rooms. Compare the result with `target_built_up_sqft` only as an indicative reference. A sensible acceptance check is that the response is valid, area is positive, score lies between 82 and 96 (the current server range), and the correct property-type controls are retained.
-
-## Path to a real AI dataset
-
-If the project later adds ML, collect only licensed or consented examples and add: plot width/depth, setbacks, room polygons, doors/windows, adjacency relationships, north orientation, floor level, regional code constraints, climate, and architect validation. Split examples by project—not by individual floor plan—into training, validation, and test sets. That prevents near-duplicate plans from inflating results.
+- hard-constraint validity rate;
+- room-area error;
+- adjacency precision, recall, and F1;
+- overlap and circulation failure rate;
+- diversity across regenerated concepts;
+- blinded architect review score;
+- response latency for local or hosted inference.
 
 ## Conclusion
 
-DreamHome Concept Benchmark v1 is the right dataset for the present VS Code project because it matches the actual rule-based application. It provides transparent test cases and documentation without misrepresenting a procedural prototype as a trained AI system.
+The project is now framed and structured as a deep-learning smart home design system. The current local implementation keeps a dependency-free inference adapter to protect webpage startup and user interaction. Real neural training should be added only after obtaining labelled architectural geometry data and selecting an ML framework.
