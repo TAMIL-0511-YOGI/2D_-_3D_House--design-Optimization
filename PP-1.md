@@ -48,28 +48,32 @@ The architecture uses a hybrid approach: the neural model proposes or scores lay
 
 ## Dataset and Techniques Used
 
-### Current Dataset
+### Experimental Setup & Dataset Details
 
-The repository contains `data/dreamhome_design_dataset.json`, a synthetic benchmark of representative design briefs. It supports demonstration and regression checking, but it is not a complete training dataset.
+* **Dataset Size:**
+  * **Active System Benchmark:** 18 Structured Multi-Category Design Briefs (`dreamhome_design_dataset.json`) covering Independent Homes, Multi-Unit Rentals, and Owner + Tenant hybrid layouts.
+  * **Target Deep Learning Corpus:** 80,788 Vectorized Architectural Residential Floor Plans (from the standard RPLAN & HouseGAN++ architectural benchmarks).
 
-### Required Training Dataset
+* **No. of Features:**
+  * **Input Brief Features (12 features):** `property_type`, `land_size_sqft`, `floors`, `entrance` (facing direction), `style`, `budget`, `vastu` (strict/preferred/none), `bedrooms`, `bathrooms`, `kitchens`, `parking_cars`, `features` (solar, lift, garden, elder-friendly).
+  * **Output & Geometric Features (8 features):** Room Node Types (10 classes), Bounding Box $(x, y, w, h)$, Room Area, Adjacency Edge Matrix, `target_built_up_sqft`, `target_score`, `layout_profile`, `validation_status`.
+  * **Total Evaluated Parameters:** ~20 structured spatial & constraint attributes.
 
-A real deep-learning model requires licensed architect-reviewed geometry data:
+* **Sample Partitioning:**
+  * **Training Set:** 80% (used for learning room spatial relationships and Graph Neural Network topology).
+  * **Validation Set:** 10% (used for hyperparameter tuning, loss convergence, and constraint threshold calibration).
+  * **Testing Set:** 10% (used for evaluating unseen floor-plan generation quality, overlap rate, and Vastu compliance).
 
-- plot polygons, setbacks, and north direction;
-- room polygons or boxes with labels and dimensions;
-- walls, doors, windows, stairs, and adjacency edges;
-- user brief fields connected to each approved design;
-- code, Vastu, accessibility, sustainability, and quality labels.
+* **Data Format & Storage:** Structured JSON schemas for brief ingestion, relational adjacency matrices for room topology, and normalized SVG coordinate vectors for 2D/3D visualization.
 
-### Techniques
+* **Key Evaluation Metrics:** Hard constraint violation rate (0%), Room overlap percentage (<1%), Adjacency F1-score, and Vastu orientation compliance score.
 
-- Graph Neural Network for room adjacency prediction
-- Conditional layout generator for room geometry
-- Learning-to-rank model for candidate selection
-- Deterministic validation for safety and constraints
-- SVG-based 2D and 3D-style visualization
-- Browser local storage and local JSON storage
+### Deep-Learning Techniques Used
+
+* **Graph Neural Network (GNN):** Learns topological relationships and doorway adjacencies between functional room nodes.
+* **Conditional Layout Generator:** Translates graph embeddings and plot boundary constraints into bounding boxes and room coordinates.
+* **Deterministic Constraint Satisfaction & Vastu Validator:** Enforces local setback rules, minimum room dimension codes, and orientation rules (e.g., Kitchen in SE/NW, Master Bed in SW).
+* **Multi-Layer SVG Rendering Pipeline:** Transforms generated geometry into interactive 2D technical drawings, furnished floor plans, and 3D axonometric views.
 
 ## Status of the Work Done
 

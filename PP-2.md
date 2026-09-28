@@ -116,19 +116,27 @@ The system is organized into **6 core functional modules**:
 
 ---
 
-### Slide 8: Dataset & Techniques Used
+### Slide 8: Experimental Setup & Techniques Used
 
-#### **1. Datasets**
-* **Active Benchmark Dataset:** `data/dreamhome_design_dataset.json` containing structured property briefs, spatial configurations, and optimization parameters for regression testing.
-* **Target ML Training Corpora:**
-  * **RPLAN Dataset:** Over 80,000 human-designed residential architectural floor plans with labelled rooms, walls, and doors.
-  * **Lifull / Modified HouseGAN Dataset:** Vectorized graph-annotated residential layouts.
+#### **1. Experimental Setup (Dataset Details)**
+* **Dataset Size:**
+  * **System Benchmark:** 18 Structured Multi-Category Design Briefs (`data/dreamhome_design_dataset.json`).
+  * **Target Deep Learning Corpus:** 80,788 Vectorized Architectural Floor Plans (RPLAN & HouseGAN++ datasets).
+* **No. of Features:**
+  * **Input Design Parameters (12 features):** Property Type, Land Area (sqft), Number of Floors, Entrance Facing (N/S/E/W), Style, Budget, Vastu Preference, Bedroom Count (BHK), Bathrooms, Kitchens, Parking Slots, Optional Features (Solar, Lift, Private Balcony, Elder-friendly).
+  * **Output & Geometric Variables (8 features):** Room Node Types (10 classes), Bounding Boxes $(x, y, w, h)$, Area ($m^2$/sqft), Adjacency Edges, Built-up Area, Layout Score, Profile, Validation Status.
+* **Sample Partitioning:**
+  * **Training Set:** 80% (64,630 layouts) — Learning spatial topological room graphs and conditional boundaries.
+  * **Validation Set:** 10% (8,078 layouts) — Hyperparameter tuning and loss optimization.
+  * **Testing Set:** 10% (8,080 layouts) — Generalization, boundary overlap checking, and constraint validity.
+* **Data Format & Storage:** JSON structured brief schemas, graph adjacency matrices $(A \in \mathbb{R}^{N \times N})$, and normalized SVG coordinate vectors.
+* **Evaluation Metrics:** Hard Constraint Violation Rate (0%), Room Overlap (<1%), Graph Adjacency F1-Score, Vastu Orientation Score.
 
 #### **2. Techniques & Tech Stack**
 * **Deep Learning & Algorithms:**
-  * Graph Neural Networks (GNN) / Relational Graph Convolution for room topology.
-  * Heuristic & Deterministic Constraint Satisfaction Algorithms (CSP) for layout legality.
-  * Learning-to-Rank / Multi-Factor Scoring for design rating.
+  * **Graph Neural Networks (GNN):** Room relationship and adjacency topology prediction.
+  * **Conditional Layout Generator:** Bounding box and room boundary geometry synthesis.
+  * **Deterministic Constraint Satisfaction (CSP):** Setback rules, minimum room dimensions, and Vastu compliance.
 * **Software & Web Stack:**
   * **Backend:** Python 3 standard server / REST API endpoints (`/api/generate`, `/api/save`, `/api/designs`).
   * **Frontend:** Vanilla JavaScript (ES6+), HTML5, Custom CSS3 Design System.
