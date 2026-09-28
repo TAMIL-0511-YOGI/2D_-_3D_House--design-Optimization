@@ -1,7 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 const state = {
   propertyType: 'Dream Home',
-  bed: 3,
+  bed: 2,
   bath: 2,
   result: null,
   formPayload: null,
@@ -24,19 +24,24 @@ planStyles.textContent = `
 .generated-plan{width:100%;height:100%;display:block}
 .pencil-plan .plan-bg{fill:#fbf9f4}
 .pencil-plan .blueprint-grid{stroke:#d8d3c5;stroke-width:0.5;opacity:0.6}
-.pencil-plan .wall{fill:none;stroke:#2c2824;stroke-width:5;stroke-linecap:square}
+.pencil-plan .wall{fill:none;stroke:#2c2824;stroke-width:4.5;stroke-linecap:square}
 .pencil-plan .wall-hatch{stroke:#787267;stroke-width:1}
 .pencil-plan .room-label{font-family:'DM Sans',sans-serif;font-weight:700;fill:#2c2824;text-anchor:middle}
 .pencil-plan .dim-text{font-family:'DM Sans',sans-serif;font-size:9px;fill:#6f695e;text-anchor:middle}
 .pencil-plan .dim-line{stroke:#8c8475;stroke-width:1;stroke-dasharray:3 2}
-.pencil-plan .door-swing{fill:none;stroke:#5c5549;stroke-width:1.4;stroke-dasharray:4 2}
+.pencil-plan .door-swing{fill:none;stroke:#5c5549;stroke-width:1.4;stroke-dasharray:3 2}
+.pencil-plan .door-leaf{stroke:#2c2824;stroke-width:2.2;stroke-linecap:round}
+.pencil-plan .window-line{stroke:#2c2824;stroke-width:2.5;fill:#ffffff}
+.pencil-plan .window-glass{stroke:#787267;stroke-width:1}
 
 .furnished-plan .plan-bg{fill:#f4f6f9}
 .furnished-plan .room-outline{stroke:#212529;stroke-width:4.5;stroke-linejoin:round}
 .furnished-plan .room-name{font-family:Outfit,sans-serif;font-weight:700;fill:#1b2434;text-anchor:middle}
 .furnished-plan .room-size{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;fill:#5a687d;text-anchor:middle}
-.furnished-plan .door-arc{fill:none;stroke:#687890;stroke-width:1.2;stroke-dasharray:3 2}
-.furnished-plan .glass-window{stroke:#75a8d9;stroke-width:3;stroke-linecap:round}
+.furnished-plan .door-arc{fill:none;stroke:#64748b;stroke-width:1.4;stroke-dasharray:3 2}
+.furnished-plan .door-leaf{stroke:#854d0e;stroke-width:3;stroke-linecap:round}
+.furnished-plan .window-frame{stroke:#1e293b;stroke-width:2;fill:#93c5fd}
+.furnished-plan .window-sill{stroke:#0f172a;stroke-width:3;stroke-linecap:round}
 `;
 document.head.append(planStyles);
 
@@ -56,262 +61,424 @@ function show(screen, push = true) {
 }
 
 // -------------------------------------------------------------
-// Multi-Property Procedural Architectural Layout Generator
-// Handles: Dream Home (Personal), Rental Homes (Full Rental Building), and Home + Rental (Owner Ground + Upper Rentals)
+// Read Current Live Form Data
+// -------------------------------------------------------------
+function getFormData() {
+  const form = $('#designForm');
+  if (!form) {
+    return {
+      propertyType: state.propertyType || 'Dream Home',
+      bedrooms: state.bed || 2,
+      bathrooms: state.bath || 2,
+      kitchens: '1 kitchen',
+      parking: '2 cars',
+      hasLiving: true,
+      hasDining: true,
+      hasPooja: true,
+      hasUtility: false,
+      hasOffice: true,
+      hasPool: false,
+      garden: 'Small garden',
+      terrace: 'Both balcony & terrace',
+      floors: 2,
+      landSize: 2400,
+      entrance: 'North-facing',
+      style: 'Contemporary',
+      layoutCycle: 0
+    };
+  }
+
+  const formData = new FormData(form);
+  const values = Object.fromEntries(formData.entries());
+  return {
+    propertyType: state.propertyType || values.propertyType || 'Dream Home',
+    bedrooms: Number(state.bed || 2),
+    bathrooms: Number(state.bath || 2),
+    kitchens: values.kitchens || '1 kitchen',
+    parking: values.parking || '2 cars',
+    hasLiving: !!form.querySelector('input[name="livingRoom"]')?.checked,
+    hasDining: !!form.querySelector('input[name="dining"]')?.checked,
+    hasPooja: !!form.querySelector('input[name="poojaRoom"]')?.checked,
+    hasUtility: !!form.querySelector('input[name="utilityRoom"]')?.checked,
+    hasOffice: !!form.querySelector('input[name="homeOffice"]')?.checked,
+    hasPool: !!form.querySelector('input[name="swimmingPool"]')?.checked,
+    hasSmartHome: !!form.querySelector('input[name="smartHome"]')?.checked,
+    hasSolar: !!form.querySelector('input[name="solarPanels"]')?.checked,
+    hasLift: !!form.querySelector('input[name="lift"]')?.checked,
+    hasElderFriendly: !!form.querySelector('input[name="elderFriendly"]')?.checked,
+    garden: values.garden || 'Small garden',
+    terrace: values.terrace || 'Both balcony & terrace',
+    floors: Math.max(1, Number(values.floors || 2)),
+    landSize: Number(values.landSize || 2400),
+    entrance: values.entrance || 'North-facing',
+    style: values.style || 'Contemporary',
+    layoutCycle: Number(state.formPayload?.layoutCycle || 0),
+    ideas: $('#designIdeas')?.value || ''
+  };
+}
+
+// -------------------------------------------------------------
+// Procedural Architectural Layout Generator
+// Respects exact user-selected rooms, counts, and regeneration styles
 // -------------------------------------------------------------
 function planRooms(seed) {
-  const data = state.formPayload || {};
-  const propType = state.propertyType || data.propertyType || 'Home + Rental';
-  const floors = Math.max(1, Number(data.floors || 2));
-  const hasTerrace = floors > 1;
-  const floor = Math.min(state.selectedFloor, floors - 1 + Number(hasTerrace));
-  const plotSize = Math.max(300, Number(data.landSize || 2400));
-  const layoutCycle = Number(data.layoutCycle || 0);
-  const cycle = layoutCycle % 4;
+  const data = state.formPayload || getFormData();
+  const propType = state.propertyType || data.propertyType || 'Dream Home';
+  const totalFloors = Math.max(1, Number(data.floors || 2));
+  const hasTerrace = totalFloors > 1;
+  const floor = Math.min(state.selectedFloor, totalFloors - 1 + Number(hasTerrace));
+  const cycle = (Number(data.layoutCycle || 0)) % 4;
   const direction = String(data.entrance || 'North-facing').split('-')[0].toUpperCase();
-  const parkingType = String(data.parking || '2 cars');
-  const carCount = parkingType.startsWith('No') ? 0 : parkingType.startsWith('1') ? 1 : 2;
 
-  const make = (n, x, y, w, h, c, door = 'bottom', extra = {}) => ({ n, x, y, w, h, c, door, ...extra });
-  const finish = (rooms) => rooms;
+  const parkingStr = String(data.parking || '2 cars');
+  const carCount = parkingStr.startsWith('No') ? 0 : parkingStr.startsWith('1') ? 1 : 2;
+
+  const totalBeds = Math.max(1, Number(data.bedrooms || 2));
+  const totalBaths = Math.max(1, Number(data.bathrooms || 2));
+  const kitchenCount = String(data.kitchens || '1').startsWith('2') ? 2 : String(data.kitchens || '1').startsWith('3') ? 3 : 1;
+
+  const hasLiving = data.hasLiving !== false;
+  const hasDining = data.hasDining !== false;
+  const hasPooja = !!data.hasPooja;
+  const hasOffice = !!data.hasOffice;
+  const hasUtility = !!data.hasUtility;
+  const hasPool = !!data.hasPool;
+
+  // Helper room constructor with automatic doors and windows
+  const make = (n, x, y, w, h, c, extra = {}) => {
+    // Generate intelligent doors and windows based on room category and position
+    const doors = extra.doors || [];
+    const windows = extra.windows || [];
+
+    if (!extra.doors) {
+      // Default interior door placement
+      if (c === 'living' || c === 'entry') {
+        doors.push({ wall: 'bottom', offset: 0.5, width: 28, swing: 'in' });
+      } else if (x < 300) {
+        doors.push({ wall: 'right', offset: 0.5, width: 24, swing: 'in' });
+      } else {
+        doors.push({ wall: 'left', offset: 0.5, width: 24, swing: 'in' });
+      }
+    }
+
+    if (!extra.windows) {
+      // Exterior windows for rooms along canvas edges
+      if (y <= 70) windows.push({ wall: 'top', offset: 0.5, width: Math.min(50, w * 0.45) });
+      if (y + h >= 370) windows.push({ wall: 'bottom', offset: 0.5, width: Math.min(50, w * 0.45) });
+      if (x <= 45) windows.push({ wall: 'left', offset: 0.5, width: Math.min(50, h * 0.45) });
+      if (x + w >= 650) windows.push({ wall: 'right', offset: 0.5, width: Math.min(50, h * 0.45) });
+    }
+
+    return { n, x, y, w, h, c, doors, windows, ...extra };
+  };
 
   // =========================================================================
-  // 1. HOME + RENTAL (Ground Floor: Owner House, Upper Floors: Rental Houses)
+  // 1. HOME + RENTAL (Owner Residence on Ground Floor, Rentals on Upper Floors)
   // =========================================================================
   if (propType === 'Home + Rental') {
-    // --- GROUND FLOOR: OWNER RESIDENCE ---
     if (floor === 0) {
-      if (cycle === 0) {
-        // Executive Owner Residence with Independent Tenant Staircase & Meter Tower
-        return finish([
-          make('OWNER 2-CAR PORCH', 25, 190, 160, 195, 'garage', 'top', { cars: 2 }),
-          make(`OWNER ${direction} FOYER`, 25, 55, 160, 125, 'entry', 'right'),
-          make('OWNER GRAND LIVING', 195, 55, 260, 200, 'living', 'left'),
-          make('OWNER DINING AREA', 195, 265, 150, 120, 'dining', 'top'),
-          make('OWNER GOURMET KITCHEN', 465, 55, 130, 150, 'kitchen', 'left'),
-          make('OWNER MASTER SUITE', 465, 215, 130, 170, 'bed', 'left', { isMaster: true }),
-          make('OWNER POOJA & UTILITY', 355, 265, 100, 120, 'bath', 'left'),
-          make('TENANT EXTERNAL STAIRS', 605, 55, 75, 200, 'stairs', 'left'),
-          make('TENANT METERS & BIKE DECK', 605, 265, 75, 120, 'entry', 'left')
-        ]);
-      } else if (cycle === 1) {
-        // Courtyard Owner Villa with Side Tenant Pathway
-        return finish([
-          make('OWNER CARPORT & LAWN', 25, 55, 160, 140, 'garage', 'bottom', { cars: 1 }),
-          make('OWNER MASTER SUITE', 25, 205, 160, 180, 'bed', 'right', { isMaster: true }),
-          make('OWNER CENTRAL COURTYARD', 195, 55, 130, 140, 'outdoor', 'left'),
-          make('OWNER FAMILY LIVING', 195, 205, 260, 180, 'living', 'top'),
-          make('OWNER KITCHEN & DINING', 335, 55, 120, 140, 'kitchen', 'bottom'),
-          make('OWNER BEDROOM 2 / STUDY', 465, 205, 130, 180, 'bed', 'left'),
-          make('OWNER BATHROOM', 465, 55, 130, 140, 'bath', 'left'),
-          make('TENANT EXTERNAL STAIRCASE', 605, 55, 75, 220, 'stairs', 'left'),
-          make('TENANT SUB-METERS & WALKWAY', 605, 285, 75, 100, 'entry', 'left')
-        ]);
-      } else if (cycle === 2) {
-        // Symmetrical Owner House + Rear Tenant Staircase
-        return finish([
-          make('OWNER DOUBLE GARAGE', 25, 190, 160, 195, 'garage', 'top', { cars: 2 }),
-          make(`OWNER ${direction} ENTRY`, 25, 55, 160, 125, 'entry', 'right'),
-          make('OWNER LIVING & LOUNGE', 195, 55, 260, 200, 'living', 'left'),
-          make('OWNER DINING ROOM', 195, 265, 160, 120, 'dining', 'top'),
-          make('OWNER ISLAND KITCHEN', 465, 55, 130, 150, 'kitchen', 'left'),
-          make('OWNER MASTER BEDROOM', 465, 215, 130, 170, 'bed', 'left', { isMaster: true }),
-          make('TENANT EXTERNAL STAIRS', 605, 55, 70, 200, 'stairs', 'left'),
-          make('TENANT METERS & UTILITY', 605, 265, 70, 120, 'entry', 'left')
-        ]);
-      } else {
-        // Dual-Frontage Owner Villa & Tenant Entry Walkway
-        return finish([
-          make('OWNER VERANDAH & CARPORT', 25, 55, 180, 130, 'garage', 'bottom', { cars: 2 }),
-          make('OWNER MASTER BEDROOM', 25, 195, 180, 190, 'bed', 'top', { isMaster: true }),
-          make('OWNER GREAT HALL & DINING', 215, 55, 250, 210, 'living', 'left'),
-          make('OWNER CHEF KITCHEN', 215, 275, 150, 110, 'kitchen', 'top'),
-          make('OWNER ATTACHED BATH', 375, 275, 90, 110, 'bath', 'left'),
-          make('TENANT ACCESS WALKWAY', 475, 55, 190, 60, 'entry', 'bottom'),
-          make('TENANT EXTERNAL STAIRWAY', 475, 125, 190, 130, 'stairs', 'top'),
-          make('TENANT BIKE PARKING & METERS', 475, 265, 190, 120, 'entry', 'left')
-        ]);
+      const rooms = [];
+      if (carCount > 0) {
+        rooms.push(make(`OWNER ${carCount === 1 ? '1-CAR' : '2-CAR'} PORCH`, 25, 190, 160, 195, 'garage', { cars: carCount }));
       }
-    }
-
-    // --- 1ST FLOOR / UPPER FLOORS: INDEPENDENT RENTAL HOUSES ---
-    if (floor === 1 || (floor > 1 && floor < floors)) {
-      if (cycle === 0 || cycle === 3) {
-        // Twin 1BHK Independent Rental Flats (Each with Private Balcony & Sub-Meters)
-        return finish([
-          make('TENANT STAIR LANDING & LOBBY', 295, 55, 100, 120, 'stairs', 'bottom'),
-          make('COMMON UTILITY & METERS', 295, 185, 100, 200, 'entry', 'left'),
-          // Rental Flat 1 (Left 1BHK Unit)
-          make('RENTAL 1 LIVING ROOM', 25, 55, 160, 195, 'living', 'right'),
-          make('RENTAL 1 KITCHENETTE', 25, 260, 160, 125, 'kitchen', 'top'),
-          make('RENTAL 1 BEDROOM', 195, 55, 90, 195, 'bed', 'left'),
-          make('RENTAL 1 BATH & BALCONY', 195, 260, 90, 125, 'bath', 'left'),
-          // Rental Flat 2 (Right 1BHK Unit)
-          make('RENTAL 2 BEDROOM', 405, 55, 95, 195, 'bed', 'right'),
-          make('RENTAL 2 BATH & BALCONY', 405, 260, 95, 125, 'bath', 'right'),
-          make('RENTAL 2 LIVING ROOM', 510, 55, 165, 195, 'living', 'left'),
-          make('RENTAL 2 KITCHENETTE', 510, 260, 165, 125, 'kitchen', 'top')
-        ]);
-      } else if (cycle === 1) {
-        // Spacious 2BHK Rental House for Premium Tenant Family
-        return finish([
-          make('TENANT STAIRWAY & ENTRY FOYER', 25, 55, 110, 130, 'stairs', 'bottom'),
-          make('RENTAL 2BHK LIVING & DINING', 145, 55, 240, 195, 'living', 'left'),
-          make('RENTAL FRONT BALCONY', 145, 260, 240, 125, 'outdoor', 'top'),
-          make('RENTAL MODULAR KITCHEN & UTILITY', 395, 55, 135, 150, 'kitchen', 'left'),
-          make('RENTAL MASTER BEDROOM', 395, 215, 135, 170, 'bed', 'left', { isMaster: true }),
-          make('RENTAL BEDROOM 2', 540, 55, 140, 180, 'bed', 'left'),
-          make('RENTAL BATHROOM & BALCONY', 540, 245, 140, 140, 'bath', 'left')
-        ]);
-      } else {
-        // 1BHK Flat + Studio/Bachelor Unit Combo
-        return finish([
-          make('TENANT STAIRWAY & LOBBY', 305, 55, 90, 120, 'stairs', 'bottom'),
-          make('TENANT SUB-METER DUCT', 305, 185, 90, 200, 'entry', 'left'),
-          // Flat A (1BHK)
-          make('RENTAL 1BHK LIVING & DINING', 25, 55, 170, 200, 'living', 'right'),
-          make('RENTAL 1BHK KITCHEN', 25, 265, 170, 120, 'kitchen', 'top'),
-          make('RENTAL 1BHK BEDROOM', 205, 55, 90, 190, 'bed', 'left'),
-          make('RENTAL 1BHK BATH & BALCONY', 205, 255, 90, 130, 'bath', 'left'),
-          // Flat B (Studio / 1RK)
-          make('STUDIO LIVING & BED', 405, 55, 145, 200, 'living', 'left'),
-          make('STUDIO KITCHENETTE', 405, 265, 145, 120, 'kitchen', 'top'),
-          make('STUDIO BATH & BALCONY', 560, 55, 115, 330, 'bath', 'left')
-        ]);
+      rooms.push(make(`OWNER ${direction} FOYER`, 25, 55, 160, 125, 'entry'));
+      if (hasLiving) rooms.push(make('OWNER GRAND LIVING', 195, 55, 260, 200, 'living'));
+      if (hasDining) rooms.push(make('OWNER DINING AREA', 195, 265, 150, 120, 'dining'));
+      rooms.push(make('OWNER GOURMET KITCHEN', 465, 55, 130, 150, 'kitchen'));
+      rooms.push(make('OWNER MASTER SUITE', 465, 215, 130, 170, 'bed', { isMaster: true }));
+      if (hasPooja || hasUtility) {
+        rooms.push(make(hasPooja ? 'OWNER POOJA ROOM' : 'OWNER UTILITY', 355, 265, 100, 120, hasPooja ? 'pooja' : 'utility'));
       }
+      rooms.push(make('TENANT EXTERNAL STAIRS', 605, 55, 75, 200, 'stairs'));
+      rooms.push(make('TENANT METERS & UTILITY', 605, 265, 75, 120, 'entry'));
+      return rooms;
     }
-
-    // --- ROOF TERRACE ---
-    return finish([
+    if (floor === 1 || (floor > 1 && floor < totalFloors)) {
+      return [
+        make('TENANT STAIR LANDING', 295, 55, 100, 120, 'stairs'),
+        make('COMMON UTILITY & METERS', 295, 185, 100, 200, 'entry'),
+        make('RENTAL 1 LIVING ROOM', 25, 55, 160, 195, 'living'),
+        make('RENTAL 1 KITCHENETTE', 25, 260, 160, 125, 'kitchen'),
+        make('RENTAL 1 BEDROOM', 195, 55, 90, 195, 'bed'),
+        make('RENTAL 1 BATHROOM', 195, 260, 90, 125, 'bath'),
+        make('RENTAL 2 BEDROOM', 405, 55, 95, 195, 'bed'),
+        make('RENTAL 2 BATHROOM', 405, 260, 95, 125, 'bath'),
+        make('RENTAL 2 LIVING ROOM', 510, 55, 165, 195, 'living'),
+        make('RENTAL 2 KITCHENETTE', 510, 260, 165, 125, 'kitchen')
+      ];
+    }
+    // Roof Terrace
+    return [
       make('OWNER PRIVATE ROOF TERRACE', 25, 55, 320, 330, 'outdoor'),
       make('STAIRCASE CABIN', 355, 270, 105, 115, 'stairs'),
       make('TENANT OVERHEAD WATER TANKS', 475, 55, 100, 190, 'entry'),
       make('OWNER & TENANT SOLAR DECK', 475, 255, 195, 130, 'outdoor')
-    ]);
+    ];
   }
 
   // =========================================================================
-  // 2. RENTAL HOMES (Full Multi-Unit Commercial Rental Building)
+  // 2. RENTAL HOMES (Full Rental Complex)
   // =========================================================================
   if (propType === 'Rental Homes') {
     if (floor === 0) {
-      // Ground Floor: Covered Stilt Parking + Two 1BHK Units
-      return finish([
-        make('COVERED STILT PARKING', 25, 55, 260, 160, 'garage', 'bottom', { cars: 2 }),
-        make('BIKE PARKING & METERS', 25, 225, 260, 160, 'garage', 'top', { cars: 1 }),
-        make('CENTRAL STAIRCASE & LOBBY', 295, 55, 90, 330, 'stairs', 'left'),
-        make('GROUND FLAT 1 LIVING', 395, 55, 140, 180, 'living', 'left'),
-        make('GROUND FLAT 1 KITCHEN', 395, 245, 140, 140, 'kitchen', 'top'),
-        make('GROUND FLAT 1 BEDROOM', 545, 55, 130, 180, 'bed', 'left'),
-        make('GROUND FLAT 1 BATH', 545, 245, 130, 140, 'bath', 'left')
-      ]);
-    } else if (floor < floors) {
-      // Upper Floors: Two Independent 1BHK / 2BHK Rental Flats
-      return finish([
-        make('COMMON STAIR LANDING', 295, 55, 90, 130, 'stairs', 'bottom'),
-        make('ELECTRICAL & WATER DUCT', 295, 195, 90, 190, 'entry', 'left'),
-        // Rental Flat Left
-        make('RENTAL FLAT A LIVING', 25, 55, 165, 190, 'living', 'right'),
-        make('RENTAL FLAT A KITCHEN', 25, 255, 165, 130, 'kitchen', 'top'),
-        make('RENTAL FLAT A BEDROOM', 200, 55, 85, 190, 'bed', 'left'),
-        make('RENTAL FLAT A BATH', 200, 255, 85, 130, 'bath', 'left'),
-        // Rental Flat Right
-        make('RENTAL FLAT B BEDROOM', 395, 55, 95, 190, 'bed', 'right'),
-        make('RENTAL FLAT B BATH', 395, 255, 95, 130, 'bath', 'right'),
-        make('RENTAL FLAT B LIVING', 500, 55, 175, 190, 'living', 'left'),
-        make('RENTAL FLAT B KITCHEN', 500, 255, 175, 130, 'kitchen', 'top')
-      ]);
-    } else {
-      // Common Roof Terrace
-      return finish([
-        make('COMMON ROOF TERRACE', 25, 55, 320, 330, 'outdoor'),
-        make('STAIRCASE CABIN', 355, 270, 105, 115, 'stairs'),
-        make('SOLAR POWER & TANKS', 475, 55, 200, 330, 'outdoor')
-      ]);
+      return [
+        make('COVERED STILT PARKING', 25, 55, 260, 160, 'garage', { cars: 2 }),
+        make('BIKE PARKING & METERS', 25, 225, 260, 160, 'garage', { cars: 1 }),
+        make('CENTRAL STAIRCASE & LOBBY', 295, 55, 90, 330, 'stairs'),
+        make('GROUND FLAT 1 LIVING', 395, 55, 140, 180, 'living'),
+        make('GROUND FLAT 1 KITCHEN', 395, 245, 140, 140, 'kitchen'),
+        make('GROUND FLAT 1 BEDROOM', 545, 55, 130, 180, 'bed'),
+        make('GROUND FLAT 1 BATH', 545, 245, 130, 140, 'bath')
+      ];
     }
+    if (floor < totalFloors) {
+      return [
+        make('COMMON STAIR LANDING', 295, 55, 90, 130, 'stairs'),
+        make('ELECTRICAL & WATER DUCT', 295, 195, 90, 190, 'entry'),
+        make('RENTAL FLAT A LIVING', 25, 55, 165, 190, 'living'),
+        make('RENTAL FLAT A KITCHEN', 25, 255, 165, 130, 'kitchen'),
+        make('RENTAL FLAT A BEDROOM', 200, 55, 85, 190, 'bed'),
+        make('RENTAL FLAT A BATH', 200, 255, 85, 130, 'bath'),
+        make('RENTAL FLAT B BEDROOM', 395, 55, 95, 190, 'bed'),
+        make('RENTAL FLAT B BATH', 395, 255, 95, 130, 'bath'),
+        make('RENTAL FLAT B LIVING', 500, 55, 175, 190, 'living'),
+        make('RENTAL FLAT B KITCHEN', 500, 255, 175, 130, 'kitchen')
+      ];
+    }
+    return [
+      make('COMMON ROOF TERRACE', 25, 55, 320, 330, 'outdoor'),
+      make('STAIRCASE CABIN', 355, 270, 105, 115, 'stairs'),
+      make('SOLAR POWER & TANKS', 475, 55, 200, 330, 'outdoor')
+    ];
   }
 
   // =========================================================================
-  // 3. DREAM HOME (Personal House - 4 Distinct Architectural Variations)
+  // 3. DREAM HOME (Personal House)
+  // Strictly renders ONLY the requested rooms & room counts across floors!
   // =========================================================================
-  if (floor === 0) {
+
+  // Roof Terrace Floor
+  if (floor === totalFloors && hasTerrace) {
+    return [
+      make('ROOF GARDEN & TURF', 35, 60, 310, 325, 'outdoor'),
+      make('TERRACE PERGOLA LOUNGE', 355, 60, 205, 200, 'living'),
+      make('STAIRCASE CABIN', 355, 270, 105, 115, 'stairs'),
+      make('SOLAR & UTILITY DECK', 570, 60, 95, 325, 'outdoor')
+    ];
+  }
+
+  // Determine rooms for Ground Floor vs First Floor
+  if (totalFloors === 1 || floor === 0) {
+    // --- GROUND FLOOR (or Single-Floor Home) ---
+    // Ground Floor gets:
+    // - Parking (if carCount > 0)
+    // - Foyer / Entry
+    // - Living Room (if hasLiving)
+    // - Dining Area (if hasDining)
+    // - Kitchen
+    // - Pooja Room (if hasPooja)
+    // - Home Office (if hasOffice and 1 floor)
+    // - Utility (if hasUtility)
+    // - Bedrooms:
+    //   * If 1 floor: exactly totalBeds bedrooms!
+    //   * If 2+ floors: 1 bedroom on GF, remaining on upper floor!
+    // - Bathrooms:
+    //   * If 1 floor: exactly totalBaths bathrooms!
+    //   * If 2+ floors: 1 bathroom on GF, remaining on upper floor!
+    // - Staircase (if totalFloors > 1)
+
+    const gfBedsCount = totalFloors === 1 ? totalBeds : 1;
+    const gfBathsCount = totalFloors === 1 ? totalBaths : 1;
+
+    // Build room list dynamically according to variation style (cycle)
     if (cycle === 0) {
-      // Variation 0: Courtyard Modern Residence
+      // Variation 0: Courtyard Modern Style
       const list = [];
-      if (carCount > 0) list.push(make(carCount === 1 ? '1-CAR GARAGE' : 'DOUBLE GARAGE', 35, 190, 160, 195, 'garage', 'top', { cars: carCount }));
-      else list.push(make('FRONT VERANDAH', 35, 190, 160, 195, 'outdoor', 'top'));
-      list.push(make(`${direction} ENTRY FOYER`, 35, 60, 160, 120, 'entry', 'right'));
-      list.push(make('GREAT LIVING ROOM', 205, 60, 260, 205, 'living', 'left'));
-      list.push(make('DINING AREA', 205, 275, 155, 110, 'dining', 'top'));
-      list.push(make('GOURMET KITCHEN', 475, 60, 190, 150, 'kitchen', 'left'));
-      list.push(make('STAIRCASE', 370, 275, 95, 110, 'stairs', 'left'));
-      list.push(make('GUEST BEDROOM', 475, 220, 190, 115, 'bed', 'left'));
-      list.push(make('GUEST BATH', 475, 345, 190, 40, 'bath', 'left'));
-      return finish(list);
+      const leftW = 165;
+      let leftY = 60;
+
+      // Left Column
+      list.push(make(`${direction} ENTRY FOYER`, 35, leftY, leftW, 115, 'entry'));
+      leftY += 125;
+      if (carCount > 0) {
+        list.push(make(carCount === 1 ? '1-CAR GARAGE' : 'DOUBLE GARAGE', 35, leftY, leftW, 385 - leftY, 'garage', { cars: carCount }));
+      } else if (hasOffice) {
+        list.push(make('HOME OFFICE / STUDY', 35, leftY, leftW, 385 - leftY, 'office'));
+      } else if (hasPool) {
+        list.push(make('SWIMMING POOL & DECK', 35, leftY, leftW, 385 - leftY, 'outdoor'));
+      } else {
+        list.push(make('FRONT VERANDAH & LAWN', 35, leftY, leftW, 385 - leftY, 'outdoor'));
+      }
+
+      // Center Column
+      const centerW = 250;
+      if (hasLiving) {
+        list.push(make('GREAT LIVING ROOM', 210, 60, centerW, hasDining || totalFloors > 1 ? 205 : 325, 'living'));
+      }
+      if (hasDining && (totalFloors > 1 || hasPooja)) {
+        list.push(make('DINING AREA', 210, 275, 145, 110, 'dining'));
+        if (totalFloors > 1) {
+          list.push(make('STAIRCASE', 365, 275, 95, 110, 'stairs'));
+        } else if (hasPooja) {
+          list.push(make('POOJA ROOM', 365, 275, 95, 110, 'pooja'));
+        }
+      } else if (hasDining) {
+        list.push(make('DINING AREA', 210, 275, centerW, 110, 'dining'));
+      } else if (totalFloors > 1) {
+        list.push(make('STAIRCASE', 210, 275, centerW, 110, 'stairs'));
+      }
+
+      // Right Column: Kitchen, Bedrooms & Baths
+      const rightW = 195;
+      list.push(make('GOURMET KITCHEN', 470, 60, rightW, 145, 'kitchen'));
+
+      // Add GF bedrooms
+      if (gfBedsCount === 1) {
+        list.push(make('GUEST BEDROOM', 470, 215, rightW, gfBathsCount > 0 ? 115 : 170, 'bed'));
+      } else if (gfBedsCount === 2) {
+        list.push(make('MASTER BEDROOM', 470, 215, rightW, 95, 'bed', { isMaster: true }));
+        list.push(make('BEDROOM 2', 470, 315, rightW - 65, 70, 'bed'));
+      } else {
+        list.push(make('MASTER SUITE', 470, 215, rightW, 95, 'bed', { isMaster: true }));
+        list.push(make(`BEDROOM (1 of ${gfBedsCount})`, 470, 315, rightW - 65, 70, 'bed'));
+      }
+
+      // Add GF bathrooms
+      if (gfBathsCount === 1) {
+        if (gfBedsCount === 1) list.push(make('GUEST BATH', 470, 335, rightW, 50, 'bath'));
+        else list.push(make('BATHROOM 1', 470 + rightW - 60, 315, 60, 70, 'bath'));
+      } else if (gfBathsCount >= 2) {
+        list.push(make('BATHROOM 1', 470 + rightW - 60, 315, 60, 70, 'bath'));
+      }
+
+      return list;
     } else if (cycle === 1) {
-      // Variation 1: Open-Concept L-Shaped Executive Villa
-      return finish([
-        make('CARPORT & ENTRYWAY', 35, 55, 165, 150, 'garage', 'bottom', { cars: 2 }),
-        make('HOME OFFICE / STUDY', 35, 215, 165, 170, 'office', 'right'),
-        make('OPEN GREAT HALL', 210, 55, 275, 220, 'living', 'left'),
-        make('CHEF PENINSULA KITCHEN', 210, 285, 165, 100, 'kitchen', 'top'),
-        make('DINING SPACE', 385, 285, 100, 100, 'dining', 'top'),
-        make('MASTER BEDROOM SUITE', 495, 55, 170, 200, 'bed', 'left', { isMaster: true }),
-        make('MASTER ENSUITE BATH', 495, 265, 90, 120, 'bath', 'top'),
-        make('ALFRESCO PATIO DECK', 595, 265, 70, 120, 'outdoor', 'top')
-      ]);
+      // Variation 1: Open-Concept L-Shaped Villa
+      const list = [];
+      if (carCount > 0) list.push(make('CARPORT & PORCH', 35, 55, 165, 150, 'garage', { cars: carCount }));
+      else if (hasOffice) list.push(make('HOME OFFICE', 35, 55, 165, 150, 'office'));
+      else list.push(make('FRONT GARDEN PATIO', 35, 55, 165, 150, 'outdoor'));
+
+      if (hasOffice && carCount > 0) list.push(make('HOME OFFICE / STUDY', 35, 215, 165, 170, 'office'));
+      else if (hasPooja) list.push(make('POOJA ROOM', 35, 215, 165, 170, 'pooja'));
+      else list.push(make('OUTDOOR DECK', 35, 215, 165, 170, 'outdoor'));
+
+      if (hasLiving) list.push(make('OPEN GREAT HALL', 210, 55, 275, 220, 'living'));
+      list.push(make('CHEF PENINSULA KITCHEN', 210, 285, 155, 100, 'kitchen'));
+      if (hasDining) list.push(make('DINING SPACE', 375, 285, 110, 100, 'dining'));
+      else if (totalFloors > 1) list.push(make('STAIRCASE', 375, 285, 110, 100, 'stairs'));
+
+      // Right Wing
+      if (gfBedsCount === 1) {
+        list.push(make('MASTER BEDROOM SUITE', 495, 55, 170, 200, 'bed', { isMaster: true }));
+        list.push(make('MASTER ENSUITE BATH', 495, 265, 95, 120, 'bath'));
+      } else {
+        list.push(make('MASTER SUITE', 495, 55, 170, 120, 'bed', { isMaster: true }));
+        list.push(make('BEDROOM 2', 495, 185, 170, 110, 'bed'));
+        list.push(make('COMMON BATH', 495, 305, 95, 80, 'bath'));
+      }
+      if (totalFloors > 1 && hasDining) {
+        list.push(make('STAIRCASE', 595, 265, 70, 120, 'stairs'));
+      } else if (hasUtility) {
+        list.push(make('UTILITY ROOM', 595, 265, 70, 120, 'utility'));
+      }
+
+      return list;
     } else if (cycle === 2) {
       // Variation 2: Symmetrical Center-Hall Estate
-      return finish([
-        make('WEST FORMAL LIVING', 35, 55, 190, 215, 'living', 'right'),
-        make('MEDIA & ENTERTAINMENT', 35, 280, 190, 105, 'living', 'top'),
-        make('GRAND CENTER FOYER', 235, 55, 190, 170, 'entry', 'bottom'),
-        make('CIRCULAR STAIRCASE', 235, 235, 190, 150, 'stairs', 'top'),
-        make('FORMAL DINING ROOM', 435, 55, 230, 140, 'dining', 'left'),
-        make('CHEF ISLAND KITCHEN', 435, 205, 150, 180, 'kitchen', 'left'),
-        make('POWDER & PANTRY', 595, 205, 70, 180, 'bath', 'left')
-      ]);
+      const list = [];
+      if (hasLiving) list.push(make('WEST FORMAL LIVING', 35, 55, 190, 215, 'living'));
+      if (hasOffice) list.push(make('PRIVATE STUDY / OFFICE', 35, 280, 190, 105, 'office'));
+      else if (carCount > 0) list.push(make('PARKING BAY', 35, 280, 190, 105, 'garage', { cars: carCount }));
+      else list.push(make('LOUNGE CORNER', 35, 280, 190, 105, 'living'));
+
+      list.push(make('GRAND CENTER FOYER', 235, 55, 190, 170, 'entry'));
+      if (totalFloors > 1) list.push(make('CIRCULAR STAIRCASE', 235, 235, 190, 150, 'stairs'));
+      else if (hasPooja) list.push(make('POOJA MANDIR', 235, 235, 190, 150, 'pooja'));
+      else list.push(make('CENTRAL COURTYARD', 235, 235, 190, 150, 'outdoor'));
+
+      if (hasDining) list.push(make('FORMAL DINING ROOM', 435, 55, 230, 140, 'dining'));
+      else list.push(make('MORNING LOUNGE', 435, 55, 230, 140, 'living'));
+
+      list.push(make('CHEF ISLAND KITCHEN', 435, 205, 140, 180, 'kitchen'));
+      if (gfBedsCount >= 1) {
+        list.push(make('GUEST BEDROOM', 585, 205, 80, 110, 'bed'));
+      }
+      if (gfBathsCount >= 1) {
+        list.push(make('GUEST BATH', 585, 320, 80, 65, 'bath'));
+      }
+
+      return list;
     } else {
       // Variation 3: Dual-Wing Modern Pavilion Home
-      return finish([
-        make('GRAND LIVING PAVILION', 35, 55, 215, 200, 'living', 'right'),
-        make('ALFRESCO OUTDOOR DECK', 35, 265, 215, 120, 'outdoor', 'top'),
-        make('GLASS BREEZEWAY ENTRY', 260, 55, 140, 140, 'entry', 'bottom'),
-        make('OPEN CHEF KITCHEN & DINING', 260, 205, 140, 180, 'kitchen', 'top'),
-        make('MASTER SUITE', 410, 55, 160, 190, 'bed', 'left', { isMaster: true }),
-        make('MASTER LUXURY BATH', 580, 55, 85, 190, 'bath', 'left'),
-        make('BEDROOM 2', 410, 255, 160, 130, 'bed', 'left'),
-        make('BATHROOM 2', 580, 255, 85, 130, 'bath', 'left')
-      ]);
+      const list = [];
+      if (hasLiving) list.push(make('GRAND LIVING PAVILION', 35, 55, 215, 200, 'living'));
+      if (hasPool) list.push(make('POOL & SUN DECK', 35, 265, 215, 120, 'outdoor'));
+      else if (carCount > 0) list.push(make('COVERED CARPORT', 35, 265, 215, 120, 'garage', { cars: carCount }));
+      else list.push(make('ALFRESCO OUTDOOR DECK', 35, 265, 215, 120, 'outdoor'));
+
+      list.push(make('GLASS BREEZEWAY ENTRY', 260, 55, 140, 140, 'entry'));
+      list.push(make('OPEN CHEF KITCHEN & DINING', 260, 205, 140, totalFloors > 1 ? 110 : 180, 'kitchen'));
+      if (totalFloors > 1) list.push(make('STAIRCASE', 260, 320, 140, 65, 'stairs'));
+
+      if (gfBedsCount === 1) {
+        list.push(make('MASTER SUITE', 410, 55, 160, 190, 'bed', { isMaster: true }));
+        list.push(make('MASTER LUXURY BATH', 580, 55, 85, 190, 'bath'));
+        if (hasPooja) list.push(make('POOJA ROOM', 410, 255, 160, 130, 'pooja'));
+        else if (hasOffice) list.push(make('HOME OFFICE', 410, 255, 160, 130, 'office'));
+        else list.push(make('REAR PATIO', 410, 255, 160, 130, 'outdoor'));
+        if (hasUtility) list.push(make('UTILITY', 580, 255, 85, 130, 'utility'));
+      } else {
+        list.push(make('MASTER SUITE', 410, 55, 160, 190, 'bed', { isMaster: true }));
+        list.push(make('MASTER BATH', 580, 55, 85, 190, 'bath'));
+        list.push(make('BEDROOM 2', 410, 255, 160, 130, 'bed'));
+        list.push(make('BATHROOM 2', 580, 255, 85, 130, 'bath'));
+      }
+
+      return list;
     }
   }
 
-  // --- Dream Home Floor 1 ---
-  if (floor === 1 && floors > 1) {
-    return finish([
-      make('MASTER BEDROOM SUITE', 35, 60, 240, 200, 'bed', 'right', { isMaster: true }),
-      make('MASTER LUXURY BATH', 35, 270, 140, 115, 'bath', 'top'),
-      make('PRIVATE BALCONY', 185, 270, 90, 115, 'outdoor', 'top'),
-      make('UPPER FAMILY LOUNGE', 285, 60, 180, 190, 'living', 'left'),
-      make('STAIRCASE DOWN', 285, 260, 95, 125, 'stairs', 'top'),
-      make('BEDROOM 2', 475, 60, 190, 155, 'bed', 'left'),
-      make('EN-SUITE BATH 2', 475, 225, 95, 80, 'bath', 'left'),
-      make('WALK-IN CLOSET', 570, 225, 95, 80, 'entry', 'left'),
-      make('REAR BALCONY', 475, 315, 190, 70, 'outdoor', 'top')
-    ]);
+  // --- FIRST FLOOR (when floors > 1) ---
+  // First Floor gets:
+  // - Remaining bedrooms: totalBeds - 1
+  // - Remaining bathrooms: totalBaths - 1
+  // - Staircase landing
+  // - Upper Family Lounge / Balcony
+  const ffBedsCount = Math.max(1, totalBeds - 1);
+  const ffBathsCount = Math.max(1, totalBaths - 1);
+
+  const list = [];
+  list.push(make('MASTER BEDROOM SUITE', 35, 60, 240, 200, 'bed', { isMaster: true }));
+  list.push(make('MASTER LUXURY BATH', 35, 270, 140, 115, 'bath'));
+  list.push(make('PRIVATE BALCONY', 185, 270, 90, 115, 'outdoor'));
+
+  list.push(make('UPPER FAMILY LOUNGE', 285, 60, 180, 190, 'living'));
+  list.push(make('STAIRCASE DOWN', 285, 260, 95, 125, 'stairs'));
+
+  // Remaining bedrooms on First Floor
+  if (ffBedsCount === 1) {
+    list.push(make('BEDROOM 2', 475, 60, 190, 155, 'bed'));
+    list.push(make('EN-SUITE BATH 2', 475, 225, 95, 80, 'bath'));
+    list.push(make('WALK-IN CLOSET', 570, 225, 95, 80, 'entry'));
+    list.push(make('REAR BALCONY', 475, 315, 190, 70, 'outdoor'));
+  } else if (ffBedsCount === 2) {
+    list.push(make('BEDROOM 2', 475, 60, 190, 140, 'bed'));
+    list.push(make('BEDROOM 3', 475, 210, 190, 120, 'bed'));
+    list.push(make('BATHROOM 2', 475, 335, 190, 50, 'bath'));
+  } else {
+    list.push(make('BEDROOM 2', 475, 60, 190, 100, 'bed'));
+    list.push(make('BEDROOM 3', 475, 165, 190, 100, 'bed'));
+    list.push(make(`BEDROOM (4 of ${totalBeds})`, 475, 270, 190, 65, 'bed'));
+    list.push(make('UPPER BATHROOM', 475, 340, 190, 45, 'bath'));
   }
 
-  // --- Terrace ---
-  return finish([
-    make('ROOF GARDEN & TURF', 35, 60, 310, 325, 'outdoor'),
-    make('TERRACE PERGOLA LOUNGE', 355, 60, 205, 200, 'living'),
-    make('STAIRCASE CABIN', 355, 270, 105, 115, 'stairs'),
-    make('SOLAR & UTILITY DECK', 570, 60, 95, 325, 'outdoor')
-  ]);
+  return list;
 }
 
 // -------------------------------------------------------------
 // 2D High-Detail Furnished Architectural Plan (SVG)
+// Includes real wooden doors with swing arcs and glass-pane windows for all rooms
 // -------------------------------------------------------------
 function renderFurnishedSvg(rooms, seed) {
   const defs = `
@@ -357,6 +524,97 @@ function renderFurnishedSvg(rooms, seed) {
     </defs>
   `;
 
+  // Draw architectural doors on room perimeter
+  const renderDoors = (r) => {
+    if (!r.doors || !r.doors.length) return '';
+    return r.doors.map(d => {
+      const dw = d.width || 24;
+      let dx = r.x, dy = r.y;
+      let leafX1, leafY1, leafX2, leafY2;
+      let arcPath;
+
+      if (d.wall === 'top') {
+        dx = r.x + r.w * (d.offset || 0.5) - dw / 2;
+        dy = r.y;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx; leafY2 = dy + dw;
+        arcPath = `M ${dx + dw} ${dy} A ${dw} ${dw} 0 0 1 ${dx} ${dy + dw}`;
+      } else if (d.wall === 'bottom') {
+        dx = r.x + r.w * (d.offset || 0.5) - dw / 2;
+        dy = r.y + r.h;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx; leafY2 = dy - dw;
+        arcPath = `M ${dx + dw} ${dy} A ${dw} ${dw} 0 0 0 ${dx} ${dy - dw}`;
+      } else if (d.wall === 'left') {
+        dx = r.x;
+        dy = r.y + r.h * (d.offset || 0.5) - dw / 2;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx + dw; leafY2 = dy;
+        arcPath = `M ${dx} ${dy + dw} A ${dw} ${dw} 0 0 0 ${dx + dw} ${dy}`;
+      } else {
+        // right wall
+        dx = r.x + r.w;
+        dy = r.y + r.h * (d.offset || 0.5) - dw / 2;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx - dw; leafY2 = dy;
+        arcPath = `M ${dx} ${dy + dw} A ${dw} ${dw} 0 0 1 ${dx - dw} ${dy}`;
+      }
+
+      return `
+        <g class="door-assembly">
+          <!-- Door Wall Cutout Gap -->
+          <line x1="${d.wall === 'left' || d.wall === 'right' ? dx : dx}" y1="${d.wall === 'top' || d.wall === 'bottom' ? dy : dy}" 
+                x2="${d.wall === 'left' || d.wall === 'right' ? dx : dx + dw}" y2="${d.wall === 'top' || d.wall === 'bottom' ? dy : dy + dw}" 
+                stroke="#f4f6f9" stroke-width="6"/>
+          <!-- Door Swing Arc -->
+          <path class="door-arc" d="${arcPath}"/>
+          <!-- Solid Wooden Door Leaf -->
+          <line class="door-leaf" x1="${leafX1}" y1="${leafY1}" x2="${leafX2}" y2="${leafY2}"/>
+          <!-- Pivot Hinge Pin -->
+          <circle cx="${leafX1}" cy="${leafY1}" r="2" fill="#1e293b"/>
+        </g>
+      `;
+    }).join('');
+  };
+
+  // Draw architectural windows on room exterior walls
+  const renderWindows = (r) => {
+    if (!r.windows || !r.windows.length) return '';
+    return r.windows.map(w => {
+      const ww = w.width || 36;
+      let wx = r.x, wy = r.y, wWidth = ww, wHeight = 4;
+      let sillX1, sillY1, sillX2, sillY2;
+
+      if (w.wall === 'top') {
+        wx = r.x + r.w * (w.offset || 0.5) - ww / 2;
+        wy = r.y - 2;
+        wWidth = ww; wHeight = 4;
+        sillX1 = wx - 3; sillY1 = wy; sillX2 = wx + ww + 3; sillY2 = wy;
+      } else if (w.wall === 'bottom') {
+        wx = r.x + r.w * (w.offset || 0.5) - ww / 2;
+        wy = r.y + r.h - 2;
+        wWidth = ww; wHeight = 4;
+        sillX1 = wx - 3; sillY1 = wy + 4; sillX2 = wx + ww + 3; sillY2 = wy + 4;
+      } else if (w.wall === 'left') {
+        wx = r.x - 2;
+        wy = r.y + r.h * (w.offset || 0.5) - ww / 2;
+        wWidth = 4; wHeight = ww;
+        sillX1 = wx; sillY1 = wy - 3; sillX2 = wx; sillY2 = wy + ww + 3;
+      } else {
+        // right wall
+        wx = r.x + r.w - 2;
+        wy = r.y + r.h * (w.offset || 0.5) - ww / 2;
+        wWidth = 4; wHeight = ww;
+        sillX1 = wx + 4; sillY1 = wy - 3; sillX2 = wx + 4; sillY2 = wy + ww + 3;
+      }
+
+      return `
+        <g class="window-assembly">
+          <!-- Outer Wall Sill -->
+          <line class="window-sill" x1="${sillX1}" y1="${sillY1}" x2="${sillX2}" y2="${sillY2}"/>
+          <!-- Glass Pane & Frame -->
+          <rect class="window-frame" x="${wx}" y="${wy}" width="${wWidth}" height="${wHeight}" rx="1"/>
+        </g>
+      `;
+    }).join('');
+  };
+
   // Furniture items rendered per room type
   const renderRoomFurniture = (r) => {
     const { x, y, w, h, c } = r;
@@ -366,20 +624,13 @@ function renderFurnishedSvg(rooms, seed) {
       const isDouble = r.cars !== 1 && w > 110;
       const renderCar = (cx, cy, cw, ch, carColor, glassColor) => `
         <g filter="url(#furnitureShadow)" transform="translate(${cx}, ${cy})">
-          <!-- Parking Bay Markings -->
           <rect x="-2" y="-2" width="${cw + 4}" height="${ch + 4}" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="6 4" opacity="0.8"/>
-          <!-- Car Body -->
           <rect x="2" y="2" width="${cw - 4}" height="${ch - 4}" rx="9" fill="${carColor}"/>
-          <!-- Cabin / Roof -->
           <rect x="${cw * 0.15}" y="${ch * 0.22}" width="${cw * 0.70}" height="${ch * 0.52}" rx="5" fill="#1b2434"/>
-          <!-- Front Windshield -->
           <path d="M${cw * 0.18} ${ch * 0.26} L${cw * 0.82} ${ch * 0.26} L${cw * 0.74} ${ch * 0.38} L${cw * 0.26} ${ch * 0.38} Z" fill="${glassColor}"/>
-          <!-- Rear Window -->
           <path d="M${cw * 0.24} ${ch * 0.64} L${cw * 0.76} ${ch * 0.64} L${cw * 0.80} ${ch * 0.72} L${cw * 0.20} ${ch * 0.72} Z" fill="${glassColor}"/>
-          <!-- Side Windows -->
           <rect x="${cw * 0.16}" y="${ch * 0.40}" width="3" height="${ch * 0.22}" rx="1" fill="${glassColor}"/>
           <rect x="${cw * 0.84 - 3}" y="${ch * 0.40}" width="3" height="${ch * 0.22}" rx="1" fill="${glassColor}"/>
-          <!-- Headlights & Taillights -->
           <rect x="5" y="3" width="7" height="3" rx="1" fill="#fff5b8"/>
           <rect x="${cw - 12}" y="3" width="7" height="3" rx="1" fill="#fff5b8"/>
           <rect x="5" y="${ch - 6}" width="7" height="3" rx="1" fill="#e03131"/>
@@ -401,61 +652,40 @@ function renderFurnishedSvg(rooms, seed) {
       }
     }
 
-    // --- Living Room with L-Sectional Sofa & Coffee Table ---
+    // --- Living Room with L-Sectional Sofa, Coffee Table & Plant ---
     if (c === 'living') {
       const rugW = w * 0.75, rugH = h * 0.68;
       const rugX = x + (w - rugW) / 2, rugY = y + (h - rugH) / 2 + 10;
       return `
         <g filter="url(#furnitureShadow)">
-          <!-- Area Rug -->
           <rect x="${rugX}" y="${rugY}" width="${rugW}" height="${rugH}" rx="4" fill="#ebe4d8" stroke="#d5ccbe" stroke-width="1"/>
-          <!-- L-Sectional Sofa -->
           <path d="M${rugX + 12} ${rugY + 12} h${rugW * 0.65} v${26} h-${rugW * 0.40} v${rugH * 0.55} h-${26} Z" fill="#46546b" rx="4"/>
-          <!-- Sofa Cushions Line -->
           <line x1="${rugX + 12}" y1="${rugY + 36}" x2="${rugX + 12 + rugW * 0.65}" y2="${rugY + 36}" stroke="#343f52" stroke-width="1.2"/>
           <line x1="${rugX + 38}" y1="${rugY + 36}" x2="${rugX + 38}" y2="${rugY + 12 + rugH * 0.55 + 26}" stroke="#343f52" stroke-width="1.2"/>
-          <!-- Accent Throw Pillows -->
           <rect x="${rugX + 16}" y="${rugY + 14}" width="9" height="9" rx="2" fill="#d99b43" transform="rotate(-12 ${rugX + 20} ${rugY + 18})"/>
           <rect x="${rugX + rugW * 0.65}" y="${rugY + 14}" width="9" height="9" rx="2" fill="#528cb8" transform="rotate(10 ${rugX + rugW * 0.65} ${rugY + 18})"/>
-          <!-- Glass Coffee Table -->
           <rect x="${rugX + 48}" y="${rugY + 44}" width="${rugW * 0.38}" height="${rugH * 0.28}" rx="4" fill="#bcd7eb" opacity="0.85" stroke="#7aaac7" stroke-width="1.2"/>
-          <rect x="${rugX + 54}" y="${rugY + 50}" width="10" height="7" rx="1" fill="#ffffff" opacity="0.9"/>
-          <!-- TV Console Unit on Top Wall -->
           <rect x="${x + w * 0.25}" y="${y + 5}" width="${w * 0.50}" height="10" rx="2" fill="#302a24"/>
-          <rect x="${x + w * 0.30}" y="${y + 6}" width="${w * 0.40}" height="3" fill="#121820"/>
-          <!-- Lounge Armchair -->
-          <rect x="${rugX + rugW - 24}" y="${rugY + 44}" width="20" height="24" rx="4" fill="#c49354"/>
-          <!-- Indoor Potted Plant (Monstera) -->
           <circle cx="${x + 18}" cy="${y + h - 18}" r="9" fill="#e8ded1" stroke="#a39684" stroke-width="1.2"/>
           <circle cx="${x + 18}" cy="${y + h - 18}" r="7" fill="#438a5e"/>
-          <circle cx="${x + 15}" cy="${y + h - 20}" r="4" fill="#5cb37d"/>
-          <circle cx="${x + 21}" cy="${y + h - 16}" r="3.5" fill="#5cb37d"/>
         </g>
       `;
     }
 
-    // --- Dining Room with Table & 6 Chairs ---
+    // --- Dining Room with Table & Chairs ---
     if (c === 'dining') {
       const tabW = w * 0.58, tabH = h * 0.45;
       const tabX = x + (w - tabW) / 2, tabY = y + (h - tabH) / 2;
       return `
         <g filter="url(#furnitureShadow)">
-          <!-- Dining Rug -->
           <rect x="${tabX - 14}" y="${tabY - 14}" width="${tabW + 28}" height="${tabH + 28}" rx="4" fill="#faf6ed" stroke="#ded5c4" stroke-width="1"/>
-          <!-- Dining Table -->
           <rect x="${tabX}" y="${tabY}" width="${tabW}" height="${tabH}" rx="3" fill="#544337" stroke="#362920" stroke-width="1"/>
-          <!-- Table Runner & Centerpiece -->
           <rect x="${tabX + tabW * 0.2}" y="${tabY + 2}" width="${tabW * 0.6}" height="${tabH - 4}" fill="#f2ede4" rx="1"/>
           <circle cx="${tabX + tabW / 2}" cy="${tabY + tabH / 2}" r="5" fill="#d97d55"/>
-          <!-- Top Chairs -->
           <rect x="${tabX + tabW * 0.15}" y="${tabY - 11}" width="${tabW * 0.28}" height="9" rx="2" fill="#8c7868"/>
           <rect x="${tabX + tabW * 0.57}" y="${tabY - 11}" width="${tabW * 0.28}" height="9" rx="2" fill="#8c7868"/>
-          <!-- Bottom Chairs -->
           <rect x="${tabX + tabW * 0.15}" y="${tabY + tabH + 2}" width="${tabW * 0.28}" height="9" rx="2" fill="#8c7868"/>
           <rect x="${tabX + tabW * 0.57}" y="${tabY + tabH + 2}" width="${tabW * 0.28}" height="9" rx="2" fill="#8c7868"/>
-          <!-- Side Chairs -->
-          <rect x="${tabX - 10}" y="${tabY + tabH * 0.25}" width="8" height="${tabH * 0.50}" rx="2" fill="#8c7868"/>
-          <rect x="${tabX + tabW + 2}" y="${tabY + tabH * 0.25}" width="8" height="${tabH * 0.50}" rx="2" fill="#8c7868"/>
         </g>
       `;
     }
@@ -464,78 +694,81 @@ function renderFurnishedSvg(rooms, seed) {
     if (c === 'kitchen') {
       return `
         <g filter="url(#furnitureShadow)">
-          <!-- Main Perimeter Countertop L-shape -->
           <path d="M${x + 5} ${y + 5} h${w - 10} v${28} h-${w - 42} v${h - 40} h-${28} Z" fill="#ffffff" stroke="#caced4" stroke-width="1.2"/>
-          <!-- Dual Sink with Faucet -->
           <rect x="${x + 36}" y="${y + 9}" width="28" height="18" rx="2" fill="#9dbcd4" stroke="#688ca8" stroke-width="1"/>
           <line x1="${x + 50}" y1="${y + 9}" x2="${x + 50}" y2="${y + 27}" stroke="#688ca8" stroke-width="1"/>
           <circle cx="${x + 50}" cy="${y + 8}" r="2" fill="#4d5966"/>
-          <!-- 4-Burner Induction Cooktop -->
           <rect x="${x + w - 54}" y="${y + 9}" width="28" height="18" rx="2" fill="#212529"/>
           <circle cx="${x + w - 46}" cy="${y + 14}" r="3.5" fill="#df4732"/>
           <circle cx="${x + w - 34}" cy="${y + 14}" r="3.5" fill="#df4732"/>
           <circle cx="${x + w - 46}" cy="${y + 22}" r="3" fill="#df4732"/>
           <circle cx="${x + w - 34}" cy="${y + 22}" r="3" fill="#df4732"/>
-          <!-- Kitchen Island with Waterfall Marble Edge -->
           <rect x="${x + 38}" y="${y + 50}" width="${Math.max(30, w - 60)}" height="${h * 0.36}" rx="3" fill="#ffffff" stroke="#b0b8c2" stroke-width="1.2"/>
-          <!-- Barstools -->
-          <circle cx="${x + 52}" cy="${y + 50 + h * 0.36 + 8}" r="5.5" fill="#4f463f" stroke="#c2b6a8" stroke-width="1"/>
-          <circle cx="${x + 38 + (w - 60) / 2}" cy="${y + 50 + h * 0.36 + 8}" r="5.5" fill="#4f463f" stroke="#c2b6a8" stroke-width="1"/>
-          <circle cx="${x + w - 38}" cy="${y + 50 + h * 0.36 + 8}" r="5.5" fill="#4f463f" stroke="#c2b6a8" stroke-width="1"/>
-          <!-- Stainless Steel French Door Refrigerator -->
           <rect x="${x + 6}" y="${y + h - 34}" width="26" height="28" rx="2" fill="#abb5c2" stroke="#68778a" stroke-width="1.2"/>
-          <line x1="${x + 19}" y1="${y + h - 34}" x2="${x + 19}" y2="${y + h - 6}" stroke="#526175" stroke-width="1"/>
         </g>
       `;
     }
 
-    // --- Bedroom with King Bed, Pillows, Duvet & Wardrobe ---
+    // --- Bedroom with King Bed, Pillows, Nightstands & Wardrobe ---
     if (c === 'bed') {
       const bedW = Math.min(65, w * 0.52), bedH = Math.min(78, h * 0.62);
       const bedX = x + (w - bedW) / 2, bedY = y + 15;
       return `
         <g filter="url(#furnitureShadow)">
-          <!-- Bed Headboard -->
           <rect x="${bedX - 4}" y="${bedY - 6}" width="${bedW + 8}" height="7" rx="2" fill="#524338"/>
-          <!-- Bed Frame / Mattress -->
           <rect x="${bedX}" y="${bedY}" width="${bedW}" height="${bedH}" rx="4" fill="#fafbfc" stroke="#cdd5df" stroke-width="1.2"/>
-          <!-- Bedspread / Duvet -->
           <rect x="${bedX + 2}" y="${bedY + bedH * 0.32}" width="${bedW - 4}" height="${bedH * 0.64}" rx="3" fill="#607699"/>
-          <path d="M${bedX + 2} ${bedY + bedH * 0.32} Q${bedX + bedW / 2} ${bedY + bedH * 0.38} ${bedX + bedW - 2} ${bedY + bedH * 0.32}" fill="none" stroke="#485c7d" stroke-width="1.5"/>
-          <!-- 2 Pillows -->
           <rect x="${bedX + 4}" y="${bedY + 4}" width="${bedW * 0.40}" height="14" rx="3" fill="#ffffff" stroke="#c8d2df" stroke-width="1"/>
           <rect x="${bedX + bedW * 0.54}" y="${bedY + 4}" width="${bedW * 0.40}" height="14" rx="3" fill="#ffffff" stroke="#c8d2df" stroke-width="1"/>
-          <!-- Nightstands with Lamps -->
           <rect x="${bedX - 16}" y="${bedY}" width="12" height="14" rx="2" fill="#69574a"/>
           <circle cx="${bedX - 10}" cy="${bedY + 7}" r="4" fill="#ffec99" stroke="#dfa32b" stroke-width="1"/>
           <rect x="${bedX + bedW + 4}" y="${bedY}" width="12" height="14" rx="2" fill="#69574a"/>
           <circle cx="${bedX + bedW + 10}" cy="${bedY + 7}" r="4" fill="#ffec99" stroke="#dfa32b" stroke-width="1"/>
-          <!-- Sliding Wardrobe Closet -->
           <rect x="${x + 6}" y="${y + h - 18}" width="${w - 12}" height="12" rx="2" fill="#d9d2c5" stroke="#7a7061" stroke-width="1"/>
-          <line x1="${x + w * 0.5}" y1="${y + h - 18}" x2="${x + w * 0.5}" y2="${y + h - 6}" stroke="#7a7061" stroke-width="1"/>
         </g>
       `;
     }
 
-    // --- Bathrooms with Tub / Walk-in Shower, Vanity & Toilet ---
+    // --- Bathrooms with Shower, Vanity & Toilet ---
     if (c === 'bath') {
       return `
         <g filter="url(#furnitureShadow)">
-          <!-- Glass Walk-in Shower Enclosure -->
           <rect x="${x + 5}" y="${y + 5}" width="28" height="28" rx="2" fill="#d5e8f5" stroke="#77a6c9" stroke-width="1.2"/>
           <circle cx="${x + 19}" cy="${y + 19}" r="3" fill="#5283a8"/>
-          <!-- Floating Vanity Counter with Sink -->
           <rect x="${x + w - 32}" y="${y + 6}" width="26" height="16" rx="2" fill="#ffffff" stroke="#aeb7c2" stroke-width="1.2"/>
           <ellipse cx="${x + w - 19}" cy="${y + 14}" rx="8" ry="5" fill="#ebf2f7" stroke="#7a9cb5" stroke-width="1"/>
-          <circle cx="${x + w - 19}" cy="${y + 10}" r="1.5" fill="#3b4b59"/>
-          <!-- Porcelain Toilet -->
           <rect x="${x + 8}" y="${y + h - 24}" width="14" height="6" rx="1" fill="#ffffff" stroke="#b0b8c2" stroke-width="1"/>
           <ellipse cx="${x + 15}" cy="${y + h - 12}" rx="7" ry="9" fill="#ffffff" stroke="#b0b8c2" stroke-width="1.2"/>
         </g>
       `;
     }
 
-    // --- Staircase with Steps & Railing ---
+    // --- Pooja Room ---
+    if (c === 'pooja') {
+      return `
+        <g filter="url(#furnitureShadow)">
+          <rect x="${x + w * 0.2}" y="${y + 8}" width="${w * 0.6}" height="20" rx="3" fill="#854d0e" stroke="#451a03" stroke-width="1.2"/>
+          <circle cx="${x + w / 2}" cy="${y + 18}" r="5" fill="#eab308"/>
+          <circle cx="${x + w * 0.3}" cy="${y + 18}" r="3" fill="#ea580c"/>
+          <circle cx="${x + w * 0.7}" cy="${y + 18}" r="3" fill="#ea580c"/>
+          <rect x="${x + w * 0.25}" y="${y + h - 22}" width="${w * 0.5}" height="14" rx="2" fill="#fde047" opacity="0.8"/>
+        </g>
+      `;
+    }
+
+    // --- Home Office / Study ---
+    if (c === 'office') {
+      return `
+        <g filter="url(#furnitureShadow)">
+          <rect x="${x + 12}" y="${y + 12}" width="${w * 0.55}" height="24" rx="3" fill="#4d3e33" stroke="#33271e" stroke-width="1"/>
+          <rect x="${x + 24}" y="${y + 17}" width="16" height="12" rx="1" fill="#a4b3c4"/>
+          <circle cx="${x + 32}" cy="${y + 44}" r="8" fill="#283547" stroke="#161f2c" stroke-width="1"/>
+          <rect x="${x + w - 20}" y="${y + 8}" width="14" height="${h - 16}" rx="2" fill="#695646" stroke="#423429" stroke-width="1"/>
+        </g>
+      `;
+    }
+
+    // --- Staircase ---
     if (c === 'stairs') {
       const steps = 9;
       const stepH = (h - 14) / steps;
@@ -546,25 +779,8 @@ function renderFurnishedSvg(rooms, seed) {
             <line x1="${x + 5}" y1="${y + 7 + i * stepH}" x2="${x + w - 5}" y2="${y + 7 + i * stepH}" stroke="#6e6254" stroke-width="1.3"/>
           `).join('')}
           <line x1="${x + 10}" y1="${y + 7}" x2="${x + 10}" y2="${y + h - 7}" stroke="#423a31" stroke-width="2"/>
-          <!-- UP Direction Arrow -->
           <path d="M${x + w / 2} ${y + h - 14} L${x + w / 2} ${y + 16} M${x + w / 2 - 4} ${y + 22} L${x + w / 2} ${y + 16} L${x + w / 2 + 4} ${y + 22}" fill="none" stroke="#2b241c" stroke-width="1.6"/>
           <text x="${x + w / 2}" y="${y + h - 18}" font-family="Outfit" font-size="8" font-weight="700" fill="#2b241c" text-anchor="middle">UP</text>
-        </g>
-      `;
-    }
-
-    // --- Home Office / Study ---
-    if (c === 'office') {
-      return `
-        <g filter="url(#furnitureShadow)">
-          <!-- Executive Desk -->
-          <rect x="${x + 12}" y="${y + 12}" width="${w * 0.55}" height="24" rx="3" fill="#4d3e33" stroke="#33271e" stroke-width="1"/>
-          <!-- Laptop -->
-          <rect x="${x + 24}" y="${y + 17}" width="16" height="12" rx="1" fill="#a4b3c4"/>
-          <!-- Ergonomic Office Chair -->
-          <circle cx="${x + 32}" cy="${y + 44}" r="8" fill="#283547" stroke="#161f2c" stroke-width="1"/>
-          <!-- Full-height Bookcase on Right Wall -->
-          <rect x="${x + w - 20}" y="${y + 8}" width="14" height="${h - 16}" rx="2" fill="#695646" stroke="#423429" stroke-width="1"/>
         </g>
       `;
     }
@@ -574,7 +790,7 @@ function renderFurnishedSvg(rooms, seed) {
 
   const getFloorFill = (c) => {
     if (c === 'garage') return 'url(#garageFloor)';
-    if (c === 'kitchen' || c === 'bath') return 'url(#marbleFloor)';
+    if (c === 'kitchen' || c === 'bath' || c === 'pooja') return 'url(#marbleFloor)';
     if (c === 'outdoor') return 'url(#grassPattern)';
     if (c === 'dining' || c === 'living' || c === 'bed' || c === 'office') return 'url(#woodFloor)';
     return 'url(#tileFloor)';
@@ -592,11 +808,15 @@ function renderFurnishedSvg(rooms, seed) {
         <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${floorFill}"/>
         <!-- Architectural Furniture Layer -->
         ${renderRoomFurniture(r)}
-        <!-- Room Perimeter Walls (Thick Cutaway style) -->
+        <!-- Room Perimeter Walls -->
         <rect class="room-outline" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="none"/>
-        <!-- Room Label & Dimensions Badge -->
+        <!-- Doors on Room Perimeter -->
+        ${renderDoors(r)}
+        <!-- Windows on Room Exterior -->
+        ${renderWindows(r)}
+        <!-- Room Label Badge -->
         <g>
-          <rect x="${r.x + r.w / 2 - 50}" y="${labelY - 11}" width="100" height="15" rx="3" fill="#ffffff" opacity="0.9"/>
+          <rect x="${r.x + r.w / 2 - 50}" y="${labelY - 11}" width="100" height="15" rx="3" fill="#ffffff" opacity="0.92"/>
           <text class="room-name" x="${r.x + r.w / 2}" y="${labelY}" style="font-size:${compact ? 8 : 9}px">${r.n}</text>
           ${compact ? '' : `<text class="room-size" x="${r.x + r.w / 2}" y="${labelY + 13}">${sizeStr}</text>`}
         </g>
@@ -612,7 +832,7 @@ function renderFurnishedSvg(rooms, seed) {
       <rect x="20" y="45" width="660" height="350" rx="8" fill="#e2e8f0" stroke="#b0bec5" stroke-width="2"/>
       <!-- House Floor Base -->
       <rect class="plan-bg" x="25" y="50" width="650" height="340" rx="4" filter="url(#wallShadow)"/>
-      <!-- Rooms & Furniture -->
+      <!-- Rooms, Furnishings, Doors & Windows -->
       ${roomSvg}
       <!-- Header Banner & Compass -->
       <g transform="translate(30, 28)">
@@ -631,14 +851,93 @@ function renderFurnishedSvg(rooms, seed) {
 
 // -------------------------------------------------------------
 // Pencil Sketch Architectural Blueprint Plan (SVG)
+// Shows crisp architectural door swings and double-line window symbols
 // -------------------------------------------------------------
 function renderPencilSvg(rooms, seed) {
+  const renderPencilDoors = (r) => {
+    if (!r.doors || !r.doors.length) return '';
+    return r.doors.map(d => {
+      const dw = d.width || 24;
+      let dx = r.x, dy = r.y;
+      let leafX1, leafY1, leafX2, leafY2, arcPath;
+
+      if (d.wall === 'top') {
+        dx = r.x + r.w * (d.offset || 0.5) - dw / 2;
+        dy = r.y;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx; leafY2 = dy + dw;
+        arcPath = `M ${dx + dw} ${dy} A ${dw} ${dw} 0 0 1 ${dx} ${dy + dw}`;
+      } else if (d.wall === 'bottom') {
+        dx = r.x + r.w * (d.offset || 0.5) - dw / 2;
+        dy = r.y + r.h;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx; leafY2 = dy - dw;
+        arcPath = `M ${dx + dw} ${dy} A ${dw} ${dw} 0 0 0 ${dx} ${dy - dw}`;
+      } else if (d.wall === 'left') {
+        dx = r.x;
+        dy = r.y + r.h * (d.offset || 0.5) - dw / 2;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx + dw; leafY2 = dy;
+        arcPath = `M ${dx} ${dy + dw} A ${dw} ${dw} 0 0 0 ${dx + dw} ${dy}`;
+      } else {
+        dx = r.x + r.w;
+        dy = r.y + r.h * (d.offset || 0.5) - dw / 2;
+        leafX1 = dx; leafY1 = dy; leafX2 = dx - dw; leafY2 = dy;
+        arcPath = `M ${dx} ${dy + dw} A ${dw} ${dw} 0 0 1 ${dx - dw} ${dy}`;
+      }
+
+      return `
+        <g>
+          <line x1="${d.wall === 'left' || d.wall === 'right' ? dx : dx}" y1="${d.wall === 'top' || d.wall === 'bottom' ? dy : dy}" 
+                x2="${d.wall === 'left' || d.wall === 'right' ? dx : dx + dw}" y2="${d.wall === 'top' || d.wall === 'bottom' ? dy : dy + dw}" 
+                stroke="#fbf9f4" stroke-width="6"/>
+          <path class="door-swing" d="${arcPath}"/>
+          <line class="door-leaf" x1="${leafX1}" y1="${leafY1}" x2="${leafX2}" y2="${leafY2}"/>
+          <circle cx="${leafX1}" cy="${leafY1}" r="1.5" fill="#2c2824"/>
+        </g>
+      `;
+    }).join('');
+  };
+
+  const renderPencilWindows = (r) => {
+    if (!r.windows || !r.windows.length) return '';
+    return r.windows.map(w => {
+      const ww = w.width || 36;
+      let wx = r.x, wy = r.y, wWidth = ww, wHeight = 4;
+
+      if (w.wall === 'top') {
+        wx = r.x + r.w * (w.offset || 0.5) - ww / 2;
+        wy = r.y - 2;
+        wWidth = ww; wHeight = 4;
+      } else if (w.wall === 'bottom') {
+        wx = r.x + r.w * (w.offset || 0.5) - ww / 2;
+        wy = r.y + r.h - 2;
+        wWidth = ww; wHeight = 4;
+      } else if (w.wall === 'left') {
+        wx = r.x - 2;
+        wy = r.y + r.h * (w.offset || 0.5) - ww / 2;
+        wWidth = 4; wHeight = ww;
+      } else {
+        wx = r.x + r.w - 2;
+        wy = r.y + r.h * (w.offset || 0.5) - ww / 2;
+        wWidth = 4; wHeight = ww;
+      }
+
+      return `
+        <g>
+          <rect class="window-line" x="${wx}" y="${wy}" width="${wWidth}" height="${wHeight}"/>
+          <line class="window-glass" x1="${w.wall === 'left' || w.wall === 'right' ? wx + 2 : wx}" y1="${w.wall === 'top' || w.wall === 'bottom' ? wy + 2 : wy}"
+                x2="${w.wall === 'left' || w.wall === 'right' ? wx + 2 : wx + wWidth}" y2="${w.wall === 'top' || w.wall === 'bottom' ? wy + 2 : wy + wHeight}"/>
+        </g>
+      `;
+    }).join('');
+  };
+
   const roomSvg = rooms.map(r => {
     const sizeStr = `${Math.max(8, Math.round(r.w / 16))}' × ${Math.max(7, Math.round(r.h / 15))}'`;
     return `
       <g>
         <rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="#fcfaf4" stroke="#2c2824" stroke-width="4"/>
         <rect x="${r.x + 3}" y="${r.y + 3}" width="${r.w - 6}" height="${r.h - 6}" fill="none" stroke="#7d7465" stroke-width="1"/>
+        ${renderPencilDoors(r)}
+        ${renderPencilWindows(r)}
         <text class="room-label" x="${r.x + r.w / 2}" y="${r.y + r.h / 2 - 4}" style="font-size:10px">${r.n}</text>
         <text class="dim-text" x="${r.x + r.w / 2}" y="${r.y + r.h / 2 + 13}">${sizeStr}</text>
         <line class="dim-line" x1="${r.x + 8}" y1="${r.y + r.h - 10}" x2="${r.x + r.w - 8}" y2="${r.y + r.h - 10}"/>
@@ -663,7 +962,7 @@ function renderPencilSvg(rooms, seed) {
 
 // -------------------------------------------------------------
 // Interactive 3D Cutaway Floor Plan Engine (Three.js WebGL)
-// Matches Reference Images 1 & 2
+// Includes realistic door openings and transparent 3D glass windows
 // -------------------------------------------------------------
 let threeApp = {
   renderer: null,
@@ -828,13 +1127,12 @@ function initThreeScene(container, rooms) {
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.maxPolarAngle = Math.PI / 2.05; // Do not go below ground
+  controls.maxPolarAngle = Math.PI / 2.05;
   controls.minDistance = 80;
   controls.maxDistance = 650;
   controls.target.set(0, 0, 0);
   threeApp.controls = controls;
 
-  // Textures
   if (!threeApp.textures) threeApp.textures = createProceduralTextures();
 
   // Lighting
@@ -854,12 +1152,6 @@ function initThreeScene(container, rooms) {
   dirLight.castShadow = true;
   dirLight.shadow.mapSize.width = 2048;
   dirLight.shadow.mapSize.height = 2048;
-  dirLight.shadow.camera.near = 50;
-  dirLight.shadow.camera.far = 800;
-  dirLight.shadow.camera.left = -250;
-  dirLight.shadow.camera.right = 250;
-  dirLight.shadow.camera.top = 250;
-  dirLight.shadow.camera.bottom = -250;
   dirLight.shadow.bias = -0.0005;
   scene.add(dirLight);
   threeApp.dirLight = dirLight;
@@ -872,7 +1164,7 @@ function initThreeScene(container, rooms) {
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
-  // Pavement border around house foundation
+  // Pavement base
   const baseMat = new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.7 });
   const baseGeo = new THREE.BoxGeometry(410, 4, 270);
   const baseMesh = new THREE.Mesh(baseGeo, baseMat);
@@ -880,7 +1172,7 @@ function initThreeScene(container, rooms) {
   baseMesh.receiveShadow = true;
   scene.add(baseMesh);
 
-  // Coordinate mapper from SVG 700x420 -> Three.js -190..190 X, -120..120 Z
+  // Coordinate mapper from SVG 700x420 -> Three.js
   const mapCoord = (r) => {
     const cx = (r.x + r.w / 2 - 350) * 0.54;
     const cz = (r.y + r.h / 2 - 210) * 0.54;
@@ -889,7 +1181,7 @@ function initThreeScene(container, rooms) {
     return { cx, cz, rw, rz };
   };
 
-  // Build Cutaway 3D Rooms
+  // Build Cutaway 3D Rooms with Real Doors and 3D Glass Windows
   rooms.forEach(r => {
     const { cx, cz, rw, rz } = mapCoord(r);
     const roomGroup = new THREE.Group();
@@ -898,54 +1190,110 @@ function initThreeScene(container, rooms) {
     // Floor Slab
     let floorMat;
     if (r.c === 'garage') floorMat = new THREE.MeshStandardMaterial({ map: threeApp.textures.garage, roughness: 0.7 });
-    else if (r.c === 'kitchen' || r.c === 'bath') floorMat = new THREE.MeshStandardMaterial({ map: threeApp.textures.marble, roughness: 0.3 });
+    else if (r.c === 'kitchen' || r.c === 'bath' || r.c === 'pooja') floorMat = new THREE.MeshStandardMaterial({ map: threeApp.textures.marble, roughness: 0.3 });
     else if (r.c === 'outdoor') floorMat = new THREE.MeshStandardMaterial({ map: threeApp.textures.grass, roughness: 0.8 });
     else floorMat = new THREE.MeshStandardMaterial({ map: threeApp.textures.wood, roughness: 0.5 });
 
-    const floorGeo = new THREE.BoxGeometry(rw - 1, 1.5, rz - 1);
+    const floorGeo = new THREE.BoxGeometry(rw - 0.6, 1.5, rz - 0.6);
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.receiveShadow = true;
     floorMesh.userData = { roomName: r.n, category: r.c };
     roomGroup.add(floorMesh);
     threeApp.roomMeshes.push(floorMesh);
 
-    // 3D Cutaway Walls (height 14 units, thickness 2.5 units with dark crown capping)
-    const wallHeight = 15;
-    const wallThick = 2.4;
+    // Cutaway Walls (Height 14 units, with realistic door and window openings)
+    const wallHeight = 14;
+    const wallThick = 2.2;
     const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.85 });
     const capMat = new THREE.MeshStandardMaterial({ color: 0x2b323c, roughness: 0.5 });
+    const glass3DMat = new THREE.MeshPhysicalMaterial({ color: 0x90c5f0, transmission: 0.85, transparent: true, opacity: 0.65, roughness: 0.1 });
+    const windowFrameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
 
-    const addWallSegment = (wx, wz, ww, wd) => {
-      const wallGeo = new THREE.BoxGeometry(ww, wallHeight, wd);
-      const wall = new THREE.Mesh(wallGeo, wallMat);
-      wall.position.set(wx, wallHeight / 2, wz);
-      wall.castShadow = true;
-      wall.receiveShadow = true;
-      roomGroup.add(wall);
+    // Build intelligent wall with door gaps and windows
+    const buildWallWithOpenings = (wallSide, length, wx, wz, isHorizontal) => {
+      const hasDoor = (r.doors || []).some(d => d.wall === wallSide);
+      const hasWin = (r.windows || []).some(w => w.wall === wallSide);
 
-      // Dark Wall Cap on top (matching reference images)
-      const capGeo = new THREE.BoxGeometry(ww + 0.3, 0.8, wd + 0.3);
-      const cap = new THREE.Mesh(capGeo, capMat);
-      cap.position.set(wx, wallHeight + 0.4, wz);
-      roomGroup.add(cap);
+      if (hasDoor) {
+        // Build 2 side posts leaving doorway gap in center
+        const postLen = (length - 14) / 2;
+        if (postLen > 2) {
+          const wGeo1 = isHorizontal ? new THREE.BoxGeometry(postLen, wallHeight, wallThick) : new THREE.BoxGeometry(wallThick, wallHeight, postLen);
+          const w1 = new THREE.Mesh(wGeo1, wallMat);
+          w1.position.set(isHorizontal ? wx - length / 2 + postLen / 2 : wx, wallHeight / 2, isHorizontal ? wz : wz - length / 2 + postLen / 2);
+          w1.castShadow = true;
+          roomGroup.add(w1);
+
+          const w2 = new THREE.Mesh(wGeo1, wallMat);
+          w2.position.set(isHorizontal ? wx + length / 2 - postLen / 2 : wx, wallHeight / 2, isHorizontal ? wz : wz + length / 2 - postLen / 2);
+          w2.castShadow = true;
+          roomGroup.add(w2);
+
+          // Top Header Beam (Lintel over door)
+          const lintelGeo = isHorizontal ? new THREE.BoxGeometry(14, 3, wallThick) : new THREE.BoxGeometry(wallThick, 3, 14);
+          const lintel = new THREE.Mesh(lintelGeo, wallMat);
+          lintel.position.set(wx, wallHeight - 1.5, wz);
+          roomGroup.add(lintel);
+        }
+      } else if (hasWin) {
+        // Lower Sill Wall
+        const sillGeo = isHorizontal ? new THREE.BoxGeometry(length, 4.5, wallThick) : new THREE.BoxGeometry(wallThick, 4.5, length);
+        const sill = new THREE.Mesh(sillGeo, wallMat);
+        sill.position.set(wx, 2.25, wz);
+        sill.castShadow = true;
+        roomGroup.add(sill);
+
+        // Upper Lintel Wall
+        const lintelGeo = isHorizontal ? new THREE.BoxGeometry(length, 3, wallThick) : new THREE.BoxGeometry(wallThick, 3, length);
+        const lintel = new THREE.Mesh(lintelGeo, wallMat);
+        lintel.position.set(wx, wallHeight - 1.5, wz);
+        roomGroup.add(lintel);
+
+        // 3D Glass Pane inside window opening
+        const winSpan = length * 0.65;
+        const glassGeo = isHorizontal ? new THREE.BoxGeometry(winSpan, 6.5, 0.6) : new THREE.BoxGeometry(0.6, 6.5, winSpan);
+        const glassMesh = new THREE.Mesh(glassGeo, glass3DMat);
+        glassMesh.position.set(wx, 7.75, wz);
+        roomGroup.add(glassMesh);
+
+        // Window Frame Sill
+        const frameGeo = isHorizontal ? new THREE.BoxGeometry(winSpan + 2, 0.8, wallThick + 0.6) : new THREE.BoxGeometry(wallThick + 0.6, 0.8, winSpan + 2);
+        const frameMesh = new THREE.Mesh(frameGeo, windowFrameMat);
+        frameMesh.position.set(wx, 4.5, wz);
+        roomGroup.add(frameMesh);
+      } else {
+        // Solid Wall Segment
+        const wallGeo = isHorizontal ? new THREE.BoxGeometry(length, wallHeight, wallThick) : new THREE.BoxGeometry(wallThick, wallHeight, length);
+        const wall = new THREE.Mesh(wallGeo, wallMat);
+        wall.position.set(wx, wallHeight / 2, wz);
+        wall.castShadow = true;
+        wall.receiveShadow = true;
+        roomGroup.add(wall);
+
+        // Dark Top Wall Cap
+        const capGeo = isHorizontal ? new THREE.BoxGeometry(length + 0.2, 0.6, wallThick + 0.2) : new THREE.BoxGeometry(wallThick + 0.2, 0.6, length + 0.2);
+        const cap = new THREE.Mesh(capGeo, capMat);
+        cap.position.set(wx, wallHeight + 0.3, wz);
+        roomGroup.add(cap);
+      }
     };
 
     // North Wall
-    addWallSegment(0, -rz / 2, rw, wallThick);
+    buildWallWithOpenings('top', rw, 0, -rz / 2, true);
     // South Wall
-    addWallSegment(0, rz / 2, rw, wallThick);
+    buildWallWithOpenings('bottom', rw, 0, rz / 2, true);
     // West Wall
-    addWallSegment(-rw / 2, 0, wallThick, rz);
+    buildWallWithOpenings('left', rz, -rw / 2, 0, false);
     // East Wall
-    addWallSegment(rw / 2, 0, wallThick, rz);
+    buildWallWithOpenings('right', rz, rw / 2, 0, false);
 
-    // Add 3D Furniture to room
+    // 3D Architectural Furniture
     build3DFurniture(roomGroup, r, rw, rz);
 
-    // Warm Interior Accent Point Lights
-    if (r.c === 'living' || r.c === 'bed' || r.c === 'kitchen') {
+    // Interior Warm Lights
+    if (r.c === 'living' || r.c === 'bed' || r.c === 'kitchen' || r.c === 'pooja') {
       const pl = new THREE.PointLight(0xffb74d, state.lightingMode === 'day' ? 0.8 : 1.8, 85);
-      pl.position.set(0, 12, 0);
+      pl.position.set(0, 11, 0);
       roomGroup.add(pl);
       threeApp.pointLights.push(pl);
     }
@@ -961,7 +1309,7 @@ function initThreeScene(container, rooms) {
   };
   animate();
 
-  // Raycasting / Hover Tooltip for Room Dimensions
+  // Raycasting Tooltip
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
   const tooltip = $('#roomTooltip');
@@ -994,14 +1342,12 @@ function initThreeScene(container, rooms) {
 // 3D Furniture Meshes Builder
 // -------------------------------------------------------------
 function build3DFurniture(group, r, rw, rz) {
-  // Common Materials
   const woodMat = new THREE.MeshStandardMaterial({ color: 0x544336, roughness: 0.6 });
   const fabricDarkMat = new THREE.MeshStandardMaterial({ color: 0x3a485c, roughness: 0.8 });
   const fabricLightMat = new THREE.MeshStandardMaterial({ color: 0xd9e2ec, roughness: 0.9 });
   const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x9ec5e8, transmission: 0.8, roughness: 0.1, transparent: true, opacity: 0.7 });
   const metalMat = new THREE.MeshStandardMaterial({ color: 0xabb8c6, metalness: 0.8, roughness: 0.2 });
 
-  // Helper box maker
   const box = (w, h, d, mat, px, py, pz, rx = 0, ry = 0) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(px, py + h / 2, pz);
@@ -1022,19 +1368,16 @@ function build3DFurniture(group, r, rw, rz) {
       const cGlassMat = new THREE.MeshStandardMaterial({ color: glassColor, roughness: 0.1 });
       const tireMat = new THREE.MeshStandardMaterial({ color: 0x1f242b, roughness: 0.8 });
 
-      // Lower Chassis
       const chassis = new THREE.Mesh(new THREE.BoxGeometry(18, 5, 34), bodyMat);
       chassis.position.y = 3.5;
       chassis.castShadow = true;
       carGroup.add(chassis);
 
-      // Cabin / Roof
       const cabin = new THREE.Mesh(new THREE.BoxGeometry(15, 4.5, 18), cGlassMat);
       cabin.position.set(0, 7.5, -2);
       cabin.castShadow = true;
       carGroup.add(cabin);
 
-      // 4 Wheels
       const wheelGeo = new THREE.CylinderGeometry(2.5, 2.5, 2, 16);
       wheelGeo.rotateZ(Math.PI / 2);
       [[-9.2, 2.5, 10], [9.2, 2.5, 10], [-9.2, 2.5, -10], [9.2, 2.5, -10]].forEach(([wx, wy, wz]) => {
@@ -1047,114 +1390,89 @@ function build3DFurniture(group, r, rw, rz) {
     };
 
     if (rw > 50) {
-      build3DCar(-rw * 0.24, 0, 0x1c2430, 0x6495ed); // Charcoal Metallic Sedan
-      build3DCar(rw * 0.24, 0, 0xf0f4f8, 0x7eb3d9);  // White Pearl SUV
+      build3DCar(-rw * 0.24, 0, 0x1c2430, 0x6495ed);
+      build3DCar(rw * 0.24, 0, 0xf0f4f8, 0x7eb3d9);
     } else {
       build3DCar(0, 0, 0x1c2430, 0x6495ed);
     }
     return;
   }
 
-  // --- Living Room (L-Sofa, Coffee Table, Rug, TV Console, Plant) ---
+  // --- Living Room ---
   if (r.c === 'living') {
-    // Area Rug
     box(rw * 0.75, 0.4, rz * 0.70, new THREE.MeshStandardMaterial({ color: 0xe2d9cb, roughness: 0.95 }), 0, 0, 4);
-
-    // L-Sectional Sofa
     const sofaH = 4.5;
     box(rw * 0.50, sofaH, 12, fabricDarkMat, -rw * 0.08, 0, -rz * 0.15);
     box(12, sofaH, rz * 0.38, fabricDarkMat, -rw * 0.08 - rw * 0.25 + 6, 0, 0);
-    // Pillows
     box(5, 3, 5, new THREE.MeshStandardMaterial({ color: 0xd99b43 }), -rw * 0.22, sofaH, -rz * 0.15, 0, 0.2);
     box(5, 3, 5, new THREE.MeshStandardMaterial({ color: 0x5a94b8 }), rw * 0.12, sofaH, -rz * 0.15, 0, -0.2);
-
-    // Coffee Table
     box(rw * 0.30, 0.6, rz * 0.26, glassMat, 0, 3, 2);
     box(rw * 0.30 - 2, 2.8, rz * 0.26 - 2, woodMat, 0, 0, 2);
-
-    // TV Console Wall Unit
     box(rw * 0.48, 4, 4, woodMat, 0, 0, -rz / 2 + 3);
     box(rw * 0.40, 8, 1, new THREE.MeshStandardMaterial({ color: 0x11161d, roughness: 0.2 }), 0, 4.5, -rz / 2 + 2);
-
-    // Modern Lounge Accent Chair
-    box(10, 4, 10, new THREE.MeshStandardMaterial({ color: 0xc49354 }), rw * 0.25, 0, 6, 0, -0.4);
-
-    // Potted Green Plant
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(3, 2.5, 5, 16), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-    pot.position.set(-rw / 2 + 6, 2.5, rz / 2 - 6);
-    group.add(pot);
-    const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(5), new THREE.MeshStandardMaterial({ color: 0x3b8054, roughness: 0.9 }));
-    foliage.position.set(-rw / 2 + 6, 8, rz / 2 - 6);
-    group.add(foliage);
     return;
   }
 
-  // --- Dining Room (Table + 6 Chairs) ---
+  // --- Dining Room ---
   if (r.c === 'dining') {
     const tabW = rw * 0.65, tabD = rz * 0.50;
     box(tabW, 1.2, tabD, woodMat, 0, 5.5, 0);
-    // Table Legs
     box(2, 5.5, 2, woodMat, -tabW / 2 + 2, 0, -tabD / 2 + 2);
     box(2, 5.5, 2, woodMat, tabW / 2 - 2, 0, -tabD / 2 + 2);
     box(2, 5.5, 2, woodMat, -tabW / 2 + 2, 0, tabD / 2 - 2);
     box(2, 5.5, 2, woodMat, tabW / 2 - 2, 0, tabD / 2 - 2);
-
-    // Chairs
     [-tabW * 0.28, 0, tabW * 0.28].forEach(cx => {
       box(5, 3.5, 5, fabricLightMat, cx, 0, -tabD / 2 - 4);
-      box(5, 5, 1.5, woodMat, cx, 3.5, -tabD / 2 - 6);
       box(5, 3.5, 5, fabricLightMat, cx, 0, tabD / 2 + 4);
-      box(5, 5, 1.5, woodMat, cx, 3.5, tabD / 2 + 6);
     });
     return;
   }
 
-  // --- Kitchen (Island, Barstools, Counters, Sink, Fridge) ---
+  // --- Kitchen ---
   if (r.c === 'kitchen') {
     box(rw - 6, 6.5, 8, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }), 0, 0, -rz / 2 + 5);
     box(8, 6.5, rz - 12, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 }), -rw / 2 + 5, 0, 0);
-
     const islW = rw * 0.55, islD = rz * 0.35;
     box(islW, 7, islD, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }), 4, 0, 4);
-
-    [-islW * 0.3, 0, islW * 0.3].forEach(bx => {
-      const stool = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 5.5, 16), new THREE.MeshStandardMaterial({ color: 0x3d332a }));
-      stool.position.set(4 + bx, 2.75, 4 + islD / 2 + 5);
-      group.add(stool);
-    });
-
     box(10, 13, 9, metalMat, rw / 2 - 7, 0, -rz / 2 + 6);
     return;
   }
 
-  // --- Bedrooms (King Platform Bed, Pillows, Duvet, Nightstands, Wardrobe) ---
+  // --- Bedrooms ---
   if (r.c === 'bed') {
     const bedW = Math.min(32, rw * 0.55), bedD = Math.min(38, rz * 0.65);
     box(bedW + 4, 9, 2.5, woodMat, 0, 0, -rz / 2 + 4);
     box(bedW, 4.5, bedD, new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 }), 0, 0, -rz / 2 + 4 + bedD / 2);
     box(bedW - 1, 1.5, bedD * 0.65, new THREE.MeshStandardMaterial({ color: 0x5b759e, roughness: 0.8 }), 0, 4.5, -rz / 2 + 4 + bedD * 0.65);
-    box(bedW * 0.42, 2, 7, new THREE.MeshStandardMaterial({ color: 0xffffff }), -bedW * 0.24, 4.8, -rz / 2 + 8);
-    box(bedW * 0.42, 2, 7, new THREE.MeshStandardMaterial({ color: 0xffffff }), bedW * 0.24, 4.8, -rz / 2 + 8);
-
     [-bedW / 2 - 4, bedW / 2 + 4].forEach(nx => {
       box(6, 4, 6, woodMat, nx, 0, -rz / 2 + 6);
-      const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.5, 3.5, 12), new THREE.MeshStandardMaterial({ color: 0xffe699, emissive: 0xffe699, emissiveIntensity: 0.4 }));
-      lamp.position.set(nx, 5.5, -rz / 2 + 6);
-      group.add(lamp);
     });
-
     box(rw - 8, 12, 6, new THREE.MeshStandardMaterial({ color: 0xd5cebf }), 0, 0, rz / 2 - 5);
     return;
   }
 
-  // --- Bathrooms (Shower, Vanity, Toilet) ---
+  // --- Bathrooms ---
   if (r.c === 'bath') {
     const showerMat = new THREE.MeshPhysicalMaterial({ color: 0x90c2e7, transmission: 0.85, transparent: true, opacity: 0.6 });
     box(14, 12, 14, showerMat, -rw / 2 + 9, 0, -rz / 2 + 9);
     box(16, 5, 7, new THREE.MeshStandardMaterial({ color: 0xffffff }), rw / 2 - 10, 0, -rz / 2 + 5);
-    box(14, 8, 0.5, new THREE.MeshStandardMaterial({ color: 0xb0c4de, metalness: 0.9, roughness: 0.1 }), rw / 2 - 10, 5.5, -rz / 2 + 2);
     box(6, 4.5, 9, new THREE.MeshStandardMaterial({ color: 0xffffff }), -rw / 2 + 6, 0, rz / 2 - 7);
-    box(6, 7, 4, new THREE.MeshStandardMaterial({ color: 0xffffff }), -rw / 2 + 6, 0, rz / 2 - 3);
+    return;
+  }
+
+  // --- Pooja Room ---
+  if (r.c === 'pooja') {
+    box(rw * 0.6, 8, 8, new THREE.MeshStandardMaterial({ color: 0x854d0e }), 0, 0, -rz / 2 + 5);
+    box(6, 4, 6, new THREE.MeshStandardMaterial({ color: 0xfde047 }), 0, 8, -rz / 2 + 5);
+    return;
+  }
+
+  // --- Home Office ---
+  if (r.c === 'office') {
+    box(rw * 0.60, 5, 12, woodMat, 0, 0, -rz / 2 + 8);
+    box(8, 0.8, 6, metalMat, 0, 5.2, -rz / 2 + 8);
+    box(7, 6, 7, new THREE.MeshStandardMaterial({ color: 0x222a36 }), 0, 0, -rz / 2 + 18);
+    box(8, 12, rz - 8, woodMat, rw / 2 - 5, 0, 0);
     return;
   }
 
@@ -1166,16 +1484,6 @@ function build3DFurniture(group, r, rw, rz) {
       box(rw - 6, (i + 1) * stepH, stepD, woodMat, 0, 0, -rz / 2 + 4 + i * stepD + stepD / 2);
     }
     box(1.2, 11, rz - 6, metalMat, rw / 2 - 4, 0, 0);
-    return;
-  }
-
-  // --- Home Office / Study ---
-  if (r.c === 'office') {
-    box(rw * 0.60, 5, 12, woodMat, 0, 0, -rz / 2 + 8);
-    box(8, 0.8, 6, metalMat, 0, 5.2, -rz / 2 + 8);
-    box(8, 5, 0.4, new THREE.MeshStandardMaterial({ color: 0x111111 }), 0, 5.5, -rz / 2 + 5.5);
-    box(7, 6, 7, new THREE.MeshStandardMaterial({ color: 0x222a36 }), 0, 0, -rz / 2 + 18);
-    box(8, 12, rz - 8, woodMat, rw / 2 - 5, 0, 0);
     return;
   }
 }
@@ -1238,7 +1546,7 @@ function toggleLighting() {
 function renderFloorSelector() {
   const holder = $('#floorSelector');
   if (!holder) return;
-  const propType = state.propertyType || state.formPayload?.propertyType || 'Home + Rental';
+  const propType = state.propertyType || state.formPayload?.propertyType || 'Dream Home';
   const floors = Math.max(1, Number(state.formPayload?.floors || 2));
   const hasTerrace = floors > 1;
   const count = floors + Number(hasTerrace);
@@ -1468,16 +1776,37 @@ $('#designForm').onsubmit = async (event) => {
   const button = $('.generate');
   button.disabled = true;
   button.textContent = 'Creating your concept…';
-  const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+  const formData = new FormData(event.currentTarget);
+  const values = Object.fromEntries(formData.entries());
+
   const payload = {
     ...values,
     propertyType: state.propertyType,
-    bedrooms: state.bed,
-    bathrooms: state.bath,
+    bedrooms: Number(state.bed || 2),
+    bathrooms: Number(state.bath || 2),
+    kitchens: values.kitchens || '1 kitchen',
+    parking: values.parking || '2 cars',
+    hasLiving: !!event.currentTarget.querySelector('input[name="livingRoom"]')?.checked,
+    hasDining: !!event.currentTarget.querySelector('input[name="dining"]')?.checked,
+    hasPooja: !!event.currentTarget.querySelector('input[name="poojaRoom"]')?.checked,
+    hasUtility: !!event.currentTarget.querySelector('input[name="utilityRoom"]')?.checked,
+    hasOffice: !!event.currentTarget.querySelector('input[name="homeOffice"]')?.checked,
+    hasPool: !!event.currentTarget.querySelector('input[name="swimmingPool"]')?.checked,
+    hasSmartHome: !!event.currentTarget.querySelector('input[name="smartHome"]')?.checked,
+    hasSolar: !!event.currentTarget.querySelector('input[name="solarPanels"]')?.checked,
+    hasLift: !!event.currentTarget.querySelector('input[name="lift"]')?.checked,
+    hasElderFriendly: !!event.currentTarget.querySelector('input[name="elderFriendly"]')?.checked,
+    garden: values.garden || 'Small garden',
+    terrace: values.terrace || 'Both balcony & terrace',
+    floors: Math.max(1, Number(values.floors || 2)),
+    landSize: Number(values.landSize || 2400),
+    entrance: values.entrance || 'North-facing',
+    style: values.style || 'Contemporary',
     layoutCycle: 0,
     features: [...event.currentTarget.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.name),
-    ideas: $('#designIdeas').value
+    ideas: $('#designIdeas')?.value || ''
   };
+
   try {
     await generateConcept(payload);
     show('model');
@@ -1491,7 +1820,7 @@ $('#designForm').onsubmit = async (event) => {
 };
 
 $('#regenerate').onclick = async () => {
-  if (!state.formPayload) return;
+  if (!state.formPayload) state.formPayload = getFormData();
   const button = $('#regenerate');
   button.disabled = true;
   button.textContent = 'Generating variation…';
@@ -1513,7 +1842,7 @@ $('#openHistory').onclick = () => {
 };
 
 $('#saveDesign').onclick = async () => {
-  const data = { ...state, title: $('#designTitle').textContent, ideas: $('#designIdeas').value };
+  const data = { ...state, title: $('#designTitle')?.textContent, ideas: $('#designIdeas')?.value };
   try {
     await fetch('/api/save', {
       method: 'POST',
